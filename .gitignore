@@ -1,0 +1,10 @@
+.vs/
+.vscode/
+node_modules
+.env
+public
+.cache
+.private
+__pycache__
+pages/resources
+test
