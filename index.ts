@@ -13,6 +13,7 @@ import apiRoutes from "./api/routes/index.ts";
 
 import { loggerMiddleware } from "./middlewares/logger.ts";
 import { rateLimitMiddleware } from "./middlewares/rateLimit.ts";
+import { errorHandler } from "./middlewares/errorHandler.ts";
 
 await connectDB();
 
@@ -22,9 +23,9 @@ const httpServer = http.createServer(app);
 const apolloServer: ApolloServer = createApolloServer(httpServer);
 await apolloServer.start();
 
-app.use(express.json());
 app.use(rateLimitMiddleware);
 app.use(loggerMiddleware);
+app.use(express.json());
 app.use(
   "/graphql",
   cors<cors.CorsRequest>(),
@@ -36,6 +37,9 @@ app.use(
 
 app.use(apiRoutes);
 app.use((req, res) => res.status(404).send({ error: "Route not found" }));
+
+// siempre al final
+app.use(errorHandler);
 
 httpServer.listen(PORT, () => {
   console.log(`🚀 Server ready at http://localhost:${PORT}/graphql`);
