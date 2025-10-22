@@ -11,6 +11,8 @@ import { authMiddleware } from "./middlewares/auth.ts";
 
 import apiRoutes from "./api/routes/index.ts";
 
+import { loggerMiddleware } from "./middlewares/logger.ts";
+
 await connectDB();
 
 const app = express();
@@ -20,6 +22,7 @@ const apolloServer: ApolloServer = createApolloServer(httpServer);
 await apolloServer.start();
 
 app.use(express.json());
+app.use(loggerMiddleware);
 app.use(
   "/graphql",
   cors<cors.CorsRequest>(),
