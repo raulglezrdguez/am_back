@@ -9,6 +9,8 @@ import { PORT } from "./config/index.ts";
 import { createApolloServer } from "./config/apollo.ts";
 import { authMiddleware } from "./middlewares/auth.ts";
 
+import apiRoutes from "./api/routes/index.ts";
+
 await connectDB();
 
 const app = express();
@@ -26,6 +28,9 @@ app.use(
     context: async ({ req }) => ({ currentUser: req.user }),
   })
 );
+
+app.use(apiRoutes);
+app.use((req, res) => res.status(404).send({ error: "Route not found" }));
 
 httpServer.listen(PORT, () => {
   console.log(`🚀 Server ready at http://localhost:${PORT}/graphql`);
