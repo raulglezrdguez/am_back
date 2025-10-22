@@ -1,9 +1,13 @@
 import * as userService from "../../services/user.service.ts";
-import type { CreateUserInput, UpdateUserInput } from "../../types/user.d.ts";
+import type {
+  CreateUserInput,
+  UpdateUserInput,
+  User,
+} from "../../types/user.d.ts";
 
 export default {
   Query: {
-    users: (_: any, __: any, { currentUser }: { currentUser: any }) => {
+    users: (_: any, __: any, { currentUser }: { currentUser: User }) => {
       if (currentUser?.role === 0) return userService.listUsers();
       return [];
     },
