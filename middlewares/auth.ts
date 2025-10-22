@@ -33,6 +33,8 @@ export async function authMiddleware(
         id: dbUser._id.toString(),
         name: dbUser.name,
         email: dbUser.email,
+        role: dbUser.role,
+        status: dbUser.status,
         createdAt: dbUser.createdAt.toISOString(),
         updatedAt: dbUser.createdAt.toISOString(), // Using createdAt as fallback since updatedAt might not exist
       };

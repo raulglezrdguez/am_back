@@ -13,6 +13,8 @@ export type User = {
   id: string;
   name: string;
   email: string;
+  role: number;
+  status: number;
   createdAt: string;
   updatedAt: string;
 };
