@@ -85,13 +85,52 @@ export const JSONScalar = new GraphQLScalarType({
   },
 });
 
+// StringBooleanNumber scalar type
+export const StringBooleanNumberScalar = new GraphQLScalarType({
+  name: "StringBooleanNumber",
+  description: "String | Boolean | Number custom scalar type",
+  serialize(value: unknown): string {
+    if (
+      typeof value === "string" ||
+      typeof value === "boolean" ||
+      typeof value === "number"
+    ) {
+      return value.toString();
+    }
+    throw new GraphQLError("Value must be a string, boolean or number");
+  },
+  parseValue(value: unknown): string {
+    if (
+      typeof value === "string" ||
+      typeof value === "boolean" ||
+      typeof value === "number"
+    ) {
+      return value.toString();
+    }
+    throw new GraphQLError("Value must be a string, boolean or number");
+  },
+  parseLiteral(ast): string {
+    if (
+      ast.kind === Kind.STRING ||
+      ast.kind === Kind.BOOLEAN ||
+      ast.kind === Kind.INT ||
+      ast.kind === Kind.FLOAT
+    ) {
+      return ast.value.toString();
+    }
+    throw new GraphQLError("Value must be a string, boolean or number");
+  },
+});
+
 export const scalarsTypeDefs = `#graphql
   scalar Date
   scalar JSON
+  scalar StringBooleanNumber
 `;
 
 // Export all scalars
 export const scalars = {
   Date: DateScalar,
   JSON: JSONScalar,
+  StringBooleanNumber: StringBooleanNumberScalar,
 };
