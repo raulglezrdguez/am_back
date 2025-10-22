@@ -1,5 +1,5 @@
 import User from "../models/user.model.ts";
-import type { CreateUserInput } from "../types/createUser.d.ts";
+import type { CreateUserInput } from "../types/user.d.ts";
 
 export const createUser = async (input: CreateUserInput) =>
   await User.create(input);

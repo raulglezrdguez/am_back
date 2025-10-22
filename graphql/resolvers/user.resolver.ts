@@ -1,8 +1,5 @@
 import * as userService from "../../services/user.service.ts";
-import type {
-  CreateUserInput,
-  UpdateUserInput,
-} from "../../types/createUser.d.ts";
+import type { CreateUserInput, UpdateUserInput } from "../../types/user.d.ts";
 
 export default {
   Query: {

@@ -1,4 +1,4 @@
-import type { User } from "./createUser.js";
+import type { User } from "./user.d.ts";
 
 declare global {
   namespace Express {
