@@ -12,6 +12,7 @@ import { authMiddleware } from "./middlewares/auth.ts";
 import apiRoutes from "./api/routes/index.ts";
 
 import { loggerMiddleware } from "./middlewares/logger.ts";
+import { rateLimitMiddleware } from "./middlewares/rateLimit.ts";
 
 await connectDB();
 
@@ -22,6 +23,7 @@ const apolloServer: ApolloServer = createApolloServer(httpServer);
 await apolloServer.start();
 
 app.use(express.json());
+app.use(rateLimitMiddleware);
 app.use(loggerMiddleware);
 app.use(
   "/graphql",
