@@ -30,20 +30,23 @@ const expressionSchema = new Schema(
       },
     },
     label: { type: String, required: true },
-    reference: { type: String, required: false },
+    reference: { type: String, required: false, default: "" },
     variable: { type: String, required: true },
   },
   { _id: false }
 );
 
-const questionSchema = new Schema({
-  id: { type: String, required: true },
-  text: { type: String, required: true },
-  expression: { type: expressionSchema, required: true },
-  answer: { type: String, enum: answers, required: true },
-  reference: { type: String, required: false },
-  answers: { type: [AnswerOption], required: false },
-});
+const questionSchema = new Schema(
+  {
+    id: { type: String, required: true },
+    text: { type: String, required: true },
+    expression: { type: expressionSchema, required: true },
+    answer: { type: String, enum: answers, required: true },
+    reference: { type: String, required: false },
+    answers: { type: [AnswerOption], required: false },
+  },
+  { _id: false }
+);
 
 const examSchema = new Schema(
   {
@@ -54,8 +57,8 @@ const examSchema = new Schema(
     author: { type: ObjectId, ref: "User", required: true },
     year: { type: Number, required: true },
     public: { type: Boolean, required: true, default: false },
-    expression: { type: [expressionSchema], required: false },
-    questions: { type: [questionSchema], required: false },
+    expression: { type: [expressionSchema], required: true },
+    questions: { type: [questionSchema], required: true },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
   },

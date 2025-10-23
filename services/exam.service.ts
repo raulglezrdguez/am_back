@@ -1,0 +1,85 @@
+import Exam from "../models/exam.model.ts";
+import {
+  CreateExamInput,
+  ExpressionInput,
+  UpdateExamPropertiesInput,
+} from "../types/exam.js";
+
+// List only public exams
+export const listExams = async () =>
+  await Exam.find({ public: true }).populate("author", "name email");
+
+// Get exam by ID only if it's public
+export const getExamById = async (id: string) =>
+  await Exam.findOne({ _id: id, public: true }).populate(
+    "author",
+    "name email"
+  );
+
+// List exams by author
+export const listExamsByAuthor = async (authorId: string) =>
+  await Exam.find({ author: authorId }).populate("author", "name email");
+
+// Create a new exam
+export const createExam = async (input: CreateExamInput) =>
+  await Exam.create(input);
+
+// Update exam properties
+export const updateExamProperties = async (
+  id: string,
+  input: Partial<UpdateExamPropertiesInput>
+) => await Exam.findByIdAndUpdate(id, input, { new: true });
+
+// Create exam expressions
+export const createExamExpression = async (
+  id: string,
+  input: ExpressionInput[]
+) => {
+  const exam = await Exam.findById(id);
+  if (!exam) throw new Error("Exam not found");
+
+  exam.expression?.push(...input);
+
+  return await exam.save();
+};
+
+// update exam expression
+export const updateExamExpression = async (
+  id: string,
+  input: ExpressionInput
+) => {
+  const exam = await Exam.findById(id);
+  if (!exam) throw new Error("Exam not found");
+
+  const expression = exam.expression?.find((expr) => expr.id === input.id);
+  if (!expression) throw new Error("Expression not found in exam");
+
+  expression.operator = input.operator;
+  expression.value = input.value;
+  expression.label = input.label;
+  expression.reference = input.reference || "";
+  expression.variable = input.variable;
+
+  return await exam.save();
+};
+
+// delete exam expression
+export const deleteExamExpression = async (
+  id: string,
+  expressionId: string
+) => {
+  const exam = await Exam.findById(id);
+  if (!exam) throw new Error("Exam not found");
+
+  const index = exam.expression?.findIndex((expr) => expr.id === expressionId);
+  if (index === -1 || index === undefined)
+    throw new Error("Expression not found in exam");
+
+  exam.expression?.splice(index, 1);
+
+  return await exam.save();
+};
+
+// Delete an exam
+export const deleteExam = async (id: string) =>
+  await Exam.findByIdAndDelete(id);

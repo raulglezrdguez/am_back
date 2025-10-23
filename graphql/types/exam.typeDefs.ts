@@ -90,8 +90,8 @@ export const examTypeDefs = `#graphql
         description: String!
         year: Int!
         public: Boolean!
-        expression: [ExpressionInput!]!
-        questions: [QuestionInput!]!
+        expression: [ExpressionInput]!
+        questions: [QuestionInput]!
     }
 
     input UpdateExamPropertiesInput {
@@ -109,7 +109,7 @@ export const examTypeDefs = `#graphql
         updateExamProperties(id: ID!, input: UpdateExamPropertiesInput!): Exam
 
         createExamExpression(id: ID!, input: [ExpressionInput!]!): Exam
-        updateExamExpression(id: ID!, input: [ExpressionInput!]!): Exam
+        updateExamExpression(id: ID!, input: ExpressionInput!): Exam
         deleteExamExpression(id: ID!, expressionId: String!): Exam
 
         createExamQuestion(id: ID!, input: [QuestionInput!]!): Exam
