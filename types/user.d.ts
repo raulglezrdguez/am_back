@@ -1,7 +1,7 @@
 export type CreateUserInput = {
   name: string;
   email: string;
-  password: string;
+  password?: string;
 };
 
 export type UpdateUserInput = {
@@ -15,6 +15,6 @@ export type User = {
   email: string;
   role: number;
   status: number;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
