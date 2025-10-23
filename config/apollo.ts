@@ -3,9 +3,10 @@ import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHt
 import { ApolloServerPluginLandingPageLocalDefault } from "@apollo/server/plugin/landingPage/default";
 import { typeDefs } from "../graphql/types/index.ts";
 import { resolvers } from "../graphql/resolvers/index.ts";
+import { ApolloContext } from "./apollo.context.ts";
 
 export function createApolloServer(httpServer: any) {
-  return new ApolloServer({
+  return new ApolloServer<ApolloContext>({
     typeDefs,
     resolvers,
     plugins: [

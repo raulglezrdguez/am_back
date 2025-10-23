@@ -14,13 +14,15 @@ import apiRoutes from "./api/routes/index.ts";
 import { loggerMiddleware } from "./middlewares/logger.ts";
 import { rateLimitMiddleware } from "./middlewares/rateLimit.ts";
 import { errorHandler } from "./middlewares/errorHandler.ts";
+import { ApolloContext } from "./config/apollo.context.ts";
 
 await connectDB();
 
 const app = express();
 const httpServer = http.createServer(app);
 
-const apolloServer: ApolloServer = createApolloServer(httpServer);
+const apolloServer: ApolloServer<ApolloContext> =
+  createApolloServer(httpServer);
 await apolloServer.start();
 
 app.use(rateLimitMiddleware);
