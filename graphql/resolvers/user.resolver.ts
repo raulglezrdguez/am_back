@@ -1,4 +1,4 @@
-import { ApolloContext } from "../../config/apollo.context.ts";
+import { type ApolloContext } from "../../config/apollo.context.ts";
 import * as userService from "../../services/user.service.ts";
 import type { CreateUserInput, UpdateUserInput } from "../../types/user.d.ts";
 

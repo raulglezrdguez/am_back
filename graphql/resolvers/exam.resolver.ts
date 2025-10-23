@@ -6,7 +6,7 @@ import type {
   QuestionInput,
   UpdateExamPropertiesInput,
 } from "../../types/exam.d.ts";
-import { ApolloContext } from "../../config/apollo.context.ts";
+import { type ApolloContext } from "../../config/apollo.context.ts";
 
 export default {
   Query: {

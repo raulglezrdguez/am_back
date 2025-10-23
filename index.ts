@@ -14,7 +14,7 @@ import apiRoutes from "./api/routes/index.ts";
 import { loggerMiddleware } from "./middlewares/logger.ts";
 import { rateLimitMiddleware } from "./middlewares/rateLimit.ts";
 import { errorHandler } from "./middlewares/errorHandler.ts";
-import { ApolloContext } from "./config/apollo.context.ts";
+import { type ApolloContext } from "./config/apollo.context.ts";
 
 await connectDB();
 
