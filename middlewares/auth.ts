@@ -3,31 +3,22 @@ import type { Request, Response, NextFunction } from "express";
 
 import { JWT_SECRET } from "../config/index.ts";
 import User from "../models/user.model.ts";
+import adminFirebase from "../config/admin.firebase.ts";
 
-export async function authMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  const header = req.headers.authorization || req.headers.Authorization;
-
-  if (!header || Array.isArray(header) || !header.startsWith("Bearer ")) {
-    req.user = null; // sin token → anónimo
-    return next();
-  }
-
-  const token = header.split(" ")[1];
-
+// Verifica el token contra la base de datos local
+const verifyLocalUser = async (token: string, req: any) => {
   try {
-    // Ensure JWT_SECRET is defined
     if (!JWT_SECRET) {
       throw new Error("JWT_SECRET is not defined in environment variables");
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload & {
-      id: string;
-    };
-    const dbUser = await User.findById(decoded.id).lean();
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+
+    const dbUser = await User.findOne({
+      _id: decoded.id,
+      email: decoded.email,
+      status: 1,
+    }).lean();
     if (dbUser) {
       req.user = {
         id: dbUser._id.toString(),
@@ -39,6 +30,79 @@ export async function authMiddleware(
     } else {
       req.user = null;
     }
+  } catch (error: any) {
+    console.error(error.message);
+    req.user = null;
+  }
+};
+
+export async function authMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  const header = req.headers.authorization || req.headers.Authorization;
+
+  if (
+    !header ||
+    Array.isArray(header) ||
+    (!header.startsWith("Bearer ") && !header.startsWith("bearer "))
+  ) {
+    req.user = null; // sin token → anónimo
+    return next();
+  }
+
+  const token = header.split(" ")[1];
+
+  try {
+    await verifyLocalUser(token, req);
+
+    if (req.user) {
+      return next();
+    }
+
+    // Verificar token de Firebase si es un token de Firebase
+    const firebaseUser = await adminFirebase
+      .auth()
+      .verifyIdToken(token)
+      .catch(() => null);
+
+    if (firebaseUser) {
+      const dbUser = await User.findOne({ email: firebaseUser.email }).lean();
+      if (dbUser) {
+        if (dbUser.status === 1) {
+          req.user = {
+            id: dbUser._id.toString(),
+            name: dbUser.name,
+            email: dbUser.email,
+            role: dbUser.role,
+            status: dbUser.status,
+          };
+        } else {
+          req.user = null;
+        }
+      } else if (firebaseUser.name && firebaseUser.email) {
+        const newDbUser = await User.create({
+          name: firebaseUser.name,
+          email: firebaseUser.email,
+          role: 1,
+          status: 1,
+        });
+
+        req.user = {
+          id: newDbUser._id.toString(),
+          name: newDbUser.name,
+          email: newDbUser.email,
+          role: 1,
+          status: 1,
+        };
+      } else {
+        req.user = null;
+      }
+    } else {
+      req.user = null;
+    }
+
     next();
   } catch (err) {
     req.user = null; // token inválido → anónimo
