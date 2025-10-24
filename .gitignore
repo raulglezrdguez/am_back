@@ -7,4 +7,6 @@ public
 .private
 __pycache__
 pages/resources
-test
+work
+coverage
+.DS_Store

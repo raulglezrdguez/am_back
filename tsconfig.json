@@ -15,6 +15,6 @@
     "noEmit": true,
     "typeRoots": ["./node_modules/@types", "./types"]
   },
-  "include": ["**/*.ts", "**/*.js", "types/**/*.d.ts"],
+  "include": ["**/*.ts", "**/*.js", "types/**/*.d.ts", "jest.config.cjs"],
   "exclude": ["node_modules"]
 }
