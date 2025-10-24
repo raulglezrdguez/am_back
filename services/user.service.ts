@@ -1,8 +1,16 @@
+import bcrypt from "bcrypt";
 import User from "../models/user.model.ts";
 import type { CreateUserInput } from "../types/user.d.ts";
 
-export const createUser = async (input: CreateUserInput) =>
-  await User.create(input);
+export const createUser = async (input: CreateUserInput) => {
+  if (input.password) {
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(input.password, salt);
+    input.password = hashedPassword;
+  }
+
+  return await User.create(input);
+};
 export const findByEmail = async (email: string) =>
   await User.findOne({ email });
 export const listUsers = async () => await User.find({});
