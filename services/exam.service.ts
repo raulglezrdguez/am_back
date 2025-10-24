@@ -2,6 +2,7 @@ import Exam from "../models/exam.model.ts";
 import {
   CreateExamInput,
   ExpressionInput,
+  QuestionInput,
   UpdateExamPropertiesInput,
 } from "../types/exam.js";
 
@@ -76,6 +77,58 @@ export const deleteExamExpression = async (
     throw new Error("Expression not found in exam");
 
   exam.expression?.splice(index, 1);
+
+  return await exam.save();
+};
+
+// Create exam questions
+export const createExamQuestions = async (
+  id: string,
+  input: QuestionInput[]
+) => {
+  const exam = await Exam.findById(id);
+  if (!exam) throw new Error("Exam not found");
+
+  exam.questions?.push(...input);
+
+  return await exam.save();
+};
+
+// update exam question
+export const updateExamQuestion = async (id: string, input: QuestionInput) => {
+  const exam = await Exam.findById(id);
+  if (!exam) throw new Error("Exam not found");
+
+  const question = exam.questions?.find((quest) => quest.id === input.id);
+  if (!question) throw new Error("Question not found in exam");
+
+  question.id = input.id;
+  question.text = input.text;
+  question.expression.id = input.expression.id;
+  question.expression.label = input.expression.label;
+  question.expression.operator = input.expression.operator;
+  question.expression.reference = input.expression.reference || "";
+  question.expression.value = input.expression.value;
+  question.expression.variable = input.expression.variable;
+  question.answer = input.answer;
+  question.reference = input.reference || "";
+  if (input.answers) {
+    question.answers?.push(...input.answers);
+  }
+
+  return await exam.save();
+};
+
+// delete exam question
+export const deleteExamQuestion = async (id: string, questionId: string) => {
+  const exam = await Exam.findById(id);
+  if (!exam) throw new Error("Exam not found");
+
+  const index = exam.questions?.findIndex((quest) => quest.id === questionId);
+  if (index === -1 || index === undefined)
+    throw new Error("Question not found in exam");
+
+  exam.questions?.splice(index, 1);
 
   return await exam.save();
 };

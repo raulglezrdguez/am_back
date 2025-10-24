@@ -1,7 +1,6 @@
 import * as examService from "../../services/exam.service.ts";
 import type {
   CreateExamInput,
-  AnswerOptionInput,
   ExpressionInput,
   QuestionInput,
   UpdateExamPropertiesInput,
@@ -82,6 +81,48 @@ export default {
         throw new Error("Not authorized to delete expression from this exam");
 
       return examService.deleteExamExpression(id, expressionId);
+    },
+    createExamQuestion: async (
+      _: any,
+      { id, input }: { id: string; input: QuestionInput[] },
+      { currentUser }: ApolloContext
+    ) => {
+      if (!currentUser) throw new Error("Authentication required");
+
+      const exam = await examService.getExamById(id);
+      if (!exam) throw new Error("Exam not found");
+      if (exam.author.toString() !== currentUser.id)
+        throw new Error("Not authorized to create expression to this exam");
+
+      return examService.createExamQuestions(id, input);
+    },
+    updateExamQuestion: async (
+      _: any,
+      { id, input }: { id: string; input: QuestionInput },
+      { currentUser }: ApolloContext
+    ) => {
+      if (!currentUser) throw new Error("Authentication required");
+
+      const exam = await examService.getExamById(id);
+      if (!exam) throw new Error("Exam not found");
+      if (exam.author.toString() !== currentUser.id)
+        throw new Error("Not authorized to update expression to this exam");
+
+      return examService.updateExamQuestion(id, input);
+    },
+    deleteExamQuestion: async (
+      _: any,
+      { id, questionId }: { id: string; questionId: string },
+      { currentUser }: ApolloContext
+    ) => {
+      if (!currentUser) throw new Error("Authentication required");
+
+      const exam = await examService.getExamById(id);
+      if (!exam) throw new Error("Exam not found");
+      if (exam.author.toString() !== currentUser.id)
+        throw new Error("Not authorized to delete expression from this exam");
+
+      return examService.deleteExamQuestion(id, questionId);
     },
     deleteExam: async (
       _: any,

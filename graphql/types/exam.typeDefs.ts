@@ -113,7 +113,7 @@ export const examTypeDefs = `#graphql
         deleteExamExpression(id: ID!, expressionId: String!): Exam
 
         createExamQuestion(id: ID!, input: [QuestionInput!]!): Exam
-        updateExamQuestion(id: ID!, input: [QuestionInput!]!): Exam
+        updateExamQuestion(id: ID!, input: QuestionInput!): Exam
         deleteExamQuestion(id: ID!, questionId: String!): Exam
 
         deleteExam(id: ID!): Boolean!
