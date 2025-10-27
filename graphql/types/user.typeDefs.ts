@@ -17,7 +17,7 @@ export const userTypeDefs = `#graphql
   type Mutation {
     signup(input: SignupInput!): User
     updateUser(id: ID!, input: UpdateUserInput!): User
-    deleteUser(id: ID!): Boolean!
+    deleteUser(id: ID!): User
     updateUserRole(id: ID!, role: Int!): User
     updateUserStatus(id: ID!, status: Int!): User
   }
