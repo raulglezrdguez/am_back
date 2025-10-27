@@ -59,7 +59,7 @@ export default {
       if (!currentUser) throw new Error("Authentication required");
 
       if (currentUser.role === 0) return userService.deleteUser(id);
-      return false;
+      return null;
     },
   },
 };
