@@ -18,7 +18,7 @@ import { type ApolloContext } from "./config/apollo.context.ts";
 
 await connectDB();
 
-const app = express();
+export const app = express();
 const httpServer = http.createServer(app);
 
 const apolloServer: ApolloServer<ApolloContext> =
