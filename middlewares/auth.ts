@@ -41,6 +41,10 @@ export async function authMiddleware(
   res: Response,
   next: NextFunction
 ) {
+  if ((global as any).__TEST_TEAR_DOWN__) {
+    return res.status(503).end(); // servidor cerrado
+  }
+
   const header = req.headers.authorization || req.headers.Authorization;
 
   if (
