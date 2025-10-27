@@ -7,9 +7,9 @@
   "scripts": {
     "start": "node index.ts",
     "dev": "nodemon --trace-warnings --exec npx ts-node ./index.ts",
-    "test:unit": "NODE_OPTIONS=\"--experimental-vm-modules\" npx jest tests/unit --runInBand",
-    "test:int": "NODE_OPTIONS=\"--experimental-vm-modules\" npx jest tests/integration --runInBand",
-    "test": "NODE_OPTIONS=\"--experimental-vm-modules\" npx jest --runInBand --coverage"
+    "test:unit": "NODE_OPTIONS=\"--experimental-vm-modules\" npx jest tests/unit --runInBand --detectOpenHandles",
+    "test:int": "NODE_OPTIONS=\"--experimental-vm-modules\" npx jest tests/integration --runInBand --detectOpenHandles --forceExit",
+    "test": "NODE_OPTIONS=\"--experimental-vm-modules\" npx jest --runInBand --coverage --detectOpenHandles --forceExit"
   },
   "keywords": [],
   "author": "",
