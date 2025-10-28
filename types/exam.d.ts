@@ -1,4 +1,4 @@
-import { Operator } from "./exam.ts";
+import { Answer, Operator } from "./exam.ts";
 
 export type CreateExamInput = {
   title: string;
@@ -41,7 +41,7 @@ export type QuestionInput = {
   id: string;
   text: string;
   expression: ExpressionInput;
-  answer: string;
+  answer: Answer;
   reference?: string;
   answers?: AnswerOptionInput[];
 };

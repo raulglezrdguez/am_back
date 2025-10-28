@@ -6,3 +6,9 @@ export enum Operator {
   LTE = "LTE",
   GTE = "GTE",
 }
+
+export enum Answer {
+  RADIO = "RADIO",
+  TEXT = "TEXT",
+  NUMBER = "NUMBER",
+}
