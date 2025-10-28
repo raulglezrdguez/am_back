@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const Schema = mongoose.Schema;
 const ObjectId = Schema.ObjectId;
 
-const operators = ["==", "!=", "<", ">", "<=", ">="];
+const operators = ["EQ", "NE", "LT", "GT", "LTE", "GTE"];
 const answers = ["RADIO", "TEXT", "NUMBER"];
 
 const AnswerOption = new Schema({

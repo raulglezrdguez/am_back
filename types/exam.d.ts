@@ -1,3 +1,5 @@
+import { Operator } from "./exam.ts";
+
 export type CreateExamInput = {
   title: string;
   subtitle: string;
@@ -22,7 +24,7 @@ export type UpdateExamPropertiesInput = {
 
 export type ExpressionInput = {
   id: string;
-  operator: string;
+  operator: Operator;
   value: string | boolean | number;
   label: string;
   reference?: string;
