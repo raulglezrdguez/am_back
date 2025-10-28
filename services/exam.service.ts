@@ -1,10 +1,10 @@
 import Exam from "../models/exam.model.ts";
-import {
+import type {
   CreateExamInput,
   ExpressionInput,
   QuestionInput,
   UpdateExamPropertiesInput,
-} from "../types/exam.js";
+} from "../types/exam.d.ts";
 
 // List only public exams
 export const listExams = async () =>
