@@ -10,12 +10,19 @@ import {
 export const listExams = async () =>
   await Exam.find({ public: true }).populate("author", "name email");
 
-// Get exam by ID only if it's public
-export const getExamById = async (id: string) =>
-  await Exam.findOne({ _id: id, public: true }).populate(
+// Get exam by ID only if it's public or belongs to the author
+export const getExamById = async (id: string, userId: string | null) => {
+  if (userId)
+    return await Exam.findOne({
+      _id: id,
+      $or: [{ public: true }, { author: userId }],
+    }).populate("author", "name email");
+
+  return await Exam.findOne({ _id: id, public: true }).populate(
     "author",
     "name email"
   );
+};
 
 // List exams by author
 export const listExamsByAuthor = async (authorId: string) =>
