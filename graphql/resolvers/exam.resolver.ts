@@ -10,7 +10,12 @@ import { type ApolloContext } from "../../config/apollo.context.ts";
 export default {
   Query: {
     exams: () => examService.listExams(),
-    exam: (_: any, { id }: { id: string }) => examService.getExamById(id),
+    exam: (_: any, { id }: { id: string }, { currentUser }: ApolloContext) => {
+      if (!currentUser) {
+        return examService.getExamById(id, null);
+      }
+      return examService.getExamById(id, currentUser.id);
+    },
     myExams: (_: any, __: any, { currentUser }: ApolloContext) => {
       if (!currentUser) return [];
       return examService.listExamsByAuthor(currentUser.id);
@@ -33,9 +38,9 @@ export default {
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
-      const exam = await examService.getExamById(id);
+      const exam = await examService.getExamById(id, currentUser.id);
       if (!exam) throw new Error("Exam not found");
-      if (exam.author.toString() !== currentUser.id)
+      if (exam.author._id.toString() !== currentUser.id)
         throw new Error("Not authorized to update this exam");
 
       return examService.updateExamProperties(id, input);
@@ -47,9 +52,9 @@ export default {
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
-      const exam = await examService.getExamById(id);
+      const exam = await examService.getExamById(id, currentUser.id);
       if (!exam) throw new Error("Exam not found");
-      if (exam.author.toString() !== currentUser.id)
+      if (exam.author._id.toString() !== currentUser.id)
         throw new Error("Not authorized to create expression to this exam");
 
       return examService.createExamExpression(id, input);
@@ -61,9 +66,9 @@ export default {
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
-      const exam = await examService.getExamById(id);
+      const exam = await examService.getExamById(id, currentUser.id);
       if (!exam) throw new Error("Exam not found");
-      if (exam.author.toString() !== currentUser.id)
+      if (exam.author._id.toString() !== currentUser.id)
         throw new Error("Not authorized to update expression to this exam");
 
       return examService.updateExamExpression(id, input);
@@ -75,9 +80,9 @@ export default {
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
-      const exam = await examService.getExamById(id);
+      const exam = await examService.getExamById(id, currentUser.id);
       if (!exam) throw new Error("Exam not found");
-      if (exam.author.toString() !== currentUser.id)
+      if (exam.author._id.toString() !== currentUser.id)
         throw new Error("Not authorized to delete expression from this exam");
 
       return examService.deleteExamExpression(id, expressionId);
@@ -89,9 +94,9 @@ export default {
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
-      const exam = await examService.getExamById(id);
+      const exam = await examService.getExamById(id, currentUser.id);
       if (!exam) throw new Error("Exam not found");
-      if (exam.author.toString() !== currentUser.id)
+      if (exam.author._id.toString() !== currentUser.id)
         throw new Error("Not authorized to create expression to this exam");
 
       return examService.createExamQuestions(id, input);
@@ -103,9 +108,9 @@ export default {
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
-      const exam = await examService.getExamById(id);
+      const exam = await examService.getExamById(id, currentUser.id);
       if (!exam) throw new Error("Exam not found");
-      if (exam.author.toString() !== currentUser.id)
+      if (exam.author._id.toString() !== currentUser.id)
         throw new Error("Not authorized to update expression to this exam");
 
       return examService.updateExamQuestion(id, input);
@@ -117,9 +122,9 @@ export default {
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
-      const exam = await examService.getExamById(id);
+      const exam = await examService.getExamById(id, currentUser.id);
       if (!exam) throw new Error("Exam not found");
-      if (exam.author.toString() !== currentUser.id)
+      if (exam.author._id.toString() !== currentUser.id)
         throw new Error("Not authorized to delete expression from this exam");
 
       return examService.deleteExamQuestion(id, questionId);
@@ -131,9 +136,9 @@ export default {
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
-      const exam = await examService.getExamById(id);
+      const exam = await examService.getExamById(id, currentUser.id);
       if (!exam) throw new Error("Exam not found");
-      if (exam.author.toString() !== currentUser.id)
+      if (exam.author._id.toString() !== currentUser.id)
         throw new Error("Not authorized to delete this exam");
 
       return examService.deleteExam(id);
