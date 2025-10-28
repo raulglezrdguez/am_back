@@ -134,5 +134,9 @@ export const deleteExamQuestion = async (id: string, questionId: string) => {
 };
 
 // Delete an exam
-export const deleteExam = async (id: string) =>
-  await Exam.findByIdAndDelete(id);
+export const deleteExam = async (id: string) => {
+  const exam = await Exam.findById(id);
+  if (!exam) throw new Error("Exam not found");
+
+  return await Exam.findByIdAndDelete(id);
+};
