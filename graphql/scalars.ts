@@ -1,6 +1,9 @@
 import { GraphQLScalarType, GraphQLError } from "graphql";
 import { Kind } from "graphql/language/index.js";
 
+export const BIRTHDATE_REGEX =
+  /^(?:(?:31-(0[13578]|1[02])-(19|20)\d{2})|(?:29-02-(19|20)(?:04|08|12|16|20|24|28|32|36|40|44|48|52|56|60|64|68|72|76|80|84|88|92|96))|(?:29-02-(19|20)\d{2}(?:(?:[02468][048]|[13579][26]))|(?:30-(0[469]|11)-(19|20)\d{2})|(?:0[1-9]|1\d|2[0-8])-(0[1-9]|1[0-2])-(19|20)\d{2}))$/;
+
 // Date scalar type
 export const DateScalar = new GraphQLScalarType({
   name: "Date",
@@ -122,10 +125,46 @@ export const StringBooleanNumberScalar = new GraphQLScalarType({
   },
 });
 
+export const BirthDateScalar = new GraphQLScalarType({
+  name: "BirthDate",
+  description: "Birth date as dd-mm-yyyy (valid calendar, leap-years)",
+  // valor que se envía al cliente
+  serialize(value) {
+    if (!(value instanceof Date)) {
+      throw new TypeError("BirthDate can only serialize Date instances");
+    }
+    return formatBirthDate(value);
+  },
+  // valor que viene como variable
+  parseValue(value) {
+    if (typeof value !== "string" || !BIRTHDATE_REGEX.test(value)) {
+      throw new TypeError("BirthDate must be a valid date string (dd-mm-yyyy)");
+    }
+    const [d, m, y] = value.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  },
+  // valor inline en el query
+  parseLiteral(ast) {
+    if (ast.kind !== Kind.STRING || !BIRTHDATE_REGEX.test(ast.value)) {
+      throw new TypeError("BirthDate must be a valid date string (dd-mm-yyyy)");
+    }
+    const [d, m, y] = ast.value.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  },
+});
+
+export const formatBirthDate = (date: Date): string => {
+  const d = String(date.getDate()).padStart(2, "0");
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const y = date.getFullYear();
+  return `${d}-${m}-${y}`;
+};
+
 export const scalarsTypeDefs = `#graphql
   scalar Date
   scalar JSON
   scalar StringBooleanNumber
+  scalar BirthDate
 `;
 
 // Export all scalars
@@ -133,4 +172,5 @@ export const scalars = {
   Date: DateScalar,
   JSON: JSONScalar,
   StringBooleanNumber: StringBooleanNumberScalar,
+  BirthDate: BirthDateScalar,
 };
