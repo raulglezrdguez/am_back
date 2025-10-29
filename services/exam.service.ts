@@ -120,6 +120,7 @@ export const updateExamQuestion = async (id: string, input: QuestionInput) => {
   question.answer = input.answer;
   question.reference = input.reference || "";
   if (input.answers) {
+    question.answers?.splice(0, question.answers.length);
     question.answers?.push(...input.answers);
   }
 
