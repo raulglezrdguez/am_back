@@ -1,4 +1,4 @@
-import { Answer, Operator } from "./exam.ts";
+import { Answer, Operator } from "./exam_enums.ts";
 
 export type CreateExamInput = {
   title: string;
