@@ -13,6 +13,7 @@ export type CreatePatientInput = {
   allergies?: string[];
   medications?: string[];
   public?: boolean;
+  owner: string; // User ID
 };
 
 export type UpdatePatientInput = {
