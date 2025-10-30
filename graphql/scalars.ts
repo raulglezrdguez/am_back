@@ -160,6 +160,11 @@ export const formatBirthDate = (date: Date): string => {
   return `${d}-${m}-${y}`;
 };
 
+export const parseBirthDate = (dateStr: string): Date => {
+  const [d, m, y] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+
 export const scalarsTypeDefs = `#graphql
   scalar Date
   scalar JSON
