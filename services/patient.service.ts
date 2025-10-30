@@ -10,17 +10,30 @@ export const listPatients = async (ownerId: string) =>
 
 // Get patient by ID only if it belongs to the owner
 export const getPatient = async (id: string, ownerId: string) =>
-  await Patient.findOne({ id, owner: ownerId });
+  await Patient.findOne({ _id: id, owner: ownerId });
 
 // get patient by identifier or name (public only)
-export const getPatientBy = async (identifier: string, name: string) =>
-  await Patient.find({
-    $or: [
-      { identifier: { $regex: identifier, $options: "i" } },
-      { name: { $regex: name, $options: "i" } },
-    ],
-    public: true,
-  });
+export const getPatientBy = async (identifier: string, name: string) => {
+  if (identifier && name) {
+    return await Patient.find({
+      $or: [
+        { identifier: { $regex: identifier, $options: "i" } },
+        { name: { $regex: name, $options: "i" } },
+      ],
+      public: true,
+    });
+  } else if (identifier) {
+    return await Patient.find({
+      identifier: { $regex: identifier, $options: "i" },
+      public: true,
+    });
+  } else if (name) {
+    return await Patient.find({
+      name: { $regex: name, $options: "i" },
+      public: true,
+    });
+  } else return [];
+};
 
 // Create a new patient
 export const createPatient = async (input: CreatePatientInput) =>
