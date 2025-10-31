@@ -41,7 +41,7 @@ export default {
       const exam = await examService.getExamById(id, currentUser.id);
       if (!exam) throw new Error("Exam not found");
       if (exam.author._id.toString() !== currentUser.id)
-        throw new Error("Not authorized to update this exam");
+        throw new Error("Not authorized to update properties to this exam");
 
       return examService.updateExamProperties(id, input);
     },
@@ -97,7 +97,7 @@ export default {
       const exam = await examService.getExamById(id, currentUser.id);
       if (!exam) throw new Error("Exam not found");
       if (exam.author._id.toString() !== currentUser.id)
-        throw new Error("Not authorized to create expression to this exam");
+        throw new Error("Not authorized to create question to this exam");
 
       return examService.createExamQuestions(id, input);
     },
@@ -111,7 +111,7 @@ export default {
       const exam = await examService.getExamById(id, currentUser.id);
       if (!exam) throw new Error("Exam not found");
       if (exam.author._id.toString() !== currentUser.id)
-        throw new Error("Not authorized to update expression to this exam");
+        throw new Error("Not authorized to update question to this exam");
 
       return examService.updateExamQuestion(id, input);
     },
@@ -125,7 +125,7 @@ export default {
       const exam = await examService.getExamById(id, currentUser.id);
       if (!exam) throw new Error("Exam not found");
       if (exam.author._id.toString() !== currentUser.id)
-        throw new Error("Not authorized to delete expression from this exam");
+        throw new Error("Not authorized to delete question from this exam");
 
       return examService.deleteExamQuestion(id, questionId);
     },
