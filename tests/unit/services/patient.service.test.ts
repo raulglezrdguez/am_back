@@ -155,6 +155,9 @@ describe("PatientService", () => {
     };
 
     const patient = await PatientService.createPatient({ ...input });
+
+    if (!patient) throw new Error("Patient creation failed");
+
     expect(patient).toBeDefined();
     expect(patient.identifier).toBe(input.identifier);
     expect(patient.name).toBe(input.name);
