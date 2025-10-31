@@ -13,13 +13,13 @@ export type CreateExamInput = {
 };
 
 export type UpdateExamPropertiesInput = {
-  title: string;
-  subtitle: string;
-  instructions: string;
-  description: string;
-  author: string;
-  year: number;
-  public: boolean;
+  title?: string;
+  subtitle?: string;
+  instructions?: string;
+  description?: string;
+  author?: string;
+  year?: number;
+  public?: boolean;
 };
 
 export type ExpressionInput = {
