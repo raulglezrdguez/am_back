@@ -95,12 +95,12 @@ export const examTypeDefs = `#graphql
     }
 
     input UpdateExamPropertiesInput {
-        title: String!
-        subtitle: String!
-        instructions: String!
-        description: String!
-        year: Int!
-        public: Boolean!
+        title: String
+        subtitle: String
+        instructions: String
+        description: String
+        year: Int
+        public: Boolean
     }
 
     type Mutation {
@@ -116,6 +116,6 @@ export const examTypeDefs = `#graphql
         updateExamQuestion(id: ID!, input: QuestionInput!): Exam
         deleteExamQuestion(id: ID!, questionId: String!): Exam
 
-        deleteExam(id: ID!): Boolean!
+        deleteExam(id: ID!): Exam
     }
 `;
