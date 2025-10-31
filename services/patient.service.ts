@@ -32,12 +32,18 @@ export const getPatientBy = async (identifier: string, name: string) => {
       name: { $regex: name, $options: "i" },
       public: true,
     });
-  } else return [];
+  } else
+    return await Patient.find({
+      public: true,
+    });
 };
 
 // Create a new patient
-export const createPatient = async (input: CreatePatientInput) =>
-  await Patient.create({ ...input });
+export const createPatient = async (input: CreatePatientInput) => {
+  const patient = await Patient.create({ ...input });
+
+  return await Patient.findById(patient._id).populate("owner", "name email");
+};
 
 // Update patient
 export const updatePatient = async (
