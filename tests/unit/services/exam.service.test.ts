@@ -12,6 +12,7 @@ import type {
   UpdateExamPropertiesInput,
 } from "../../../types/exam.d.ts";
 import { Answer, Operator } from "../../../types/exam_enums.ts";
+import e from "express";
 
 let mongoServer: MongoMemoryServer;
 
@@ -254,18 +255,22 @@ describe("ExamServise", () => {
     };
 
     const exam = await examService.createExam(input);
-    expect(exam).toMatchObject({
-      title: "Exam title",
-      subtitle: "Exam subtitle",
-      description: "Exam description",
-      instructions: "Exam instructions",
-      public: true,
-      year: 2025,
-      expression: [],
-      questions: [],
-    });
+
+    if (exam == null) {
+      throw new Error("Exam creation failed");
+    }
+    expect(exam).toBeDefined();
+    expect(exam._id).toBeDefined();
+    expect(exam.title).toBe("Exam title");
+    expect(exam.subtitle).toBe("Exam subtitle");
+    expect(exam.description).toBe("Exam description");
+    expect(exam.instructions).toBe("Exam instructions");
     expect(exam.author).toBeDefined();
-    expect(exam.author.toString()).toBe(user._id.toString());
+    expect(exam.author._id.toString()).toBe(user._id.toString());
+    expect(exam.public).toBe(true);
+    expect(exam.year).toBe(2025);
+    expect(exam.expression).toEqual([]);
+    expect(exam.questions).toEqual([]);
   });
 
   it("should update exam properties", async () => {
@@ -824,7 +829,7 @@ describe("ExamServise", () => {
     ).rejects.toThrow("Question not found in exam");
   });
 
-  it("should create an exam", async () => {
+  it("should delete an exam", async () => {
     const user = await User.create({
       name: "Bob",
       email: "bob@test.com",
@@ -846,8 +851,11 @@ describe("ExamServise", () => {
 
     const exam = await examService.createExam(input);
 
+    if (exam == null) {
+      throw new Error("Exam creation failed");
+    }
     await examService.deleteExam(exam._id.toString());
-    const deletedExam = await Exam.findById(exam._id.toString());
+    const deletedExam = await Exam.findByIdAndDelete(exam._id.toString());
     expect(deletedExam).toBeNull();
   });
 
