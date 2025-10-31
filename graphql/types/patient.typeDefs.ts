@@ -36,6 +36,7 @@ export const patientTypeDefs = `#graphql
         medicalHistory: String
         allergies: [String!]
         medications: [String!]
+        public: Boolean!
         owner: User!
     }
 
@@ -79,6 +80,6 @@ export const patientTypeDefs = `#graphql
 
         updatePatient(id: ID!, input: UpdatePatientInput!): PatientOutput
 
-        deletePatient(id: ID!): Boolean!
+        deletePatient(id: ID!): PatientOutput!
     }
 `;
