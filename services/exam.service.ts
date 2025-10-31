@@ -29,8 +29,10 @@ export const listExamsByAuthor = async (authorId: string) =>
   await Exam.find({ author: authorId }).populate("author", "name email");
 
 // Create a new exam
-export const createExam = async (input: CreateExamInput) =>
-  await Exam.create(input);
+export const createExam = async (input: CreateExamInput) => {
+  const exam = await Exam.create(input);
+  return getExamById(exam._id.toString(), exam.author.toString());
+};
 
 // Update exam properties
 export const updateExamProperties = async (
