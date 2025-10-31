@@ -31,7 +31,6 @@ const verifyLocalUser = async (token: string, req: any) => {
       req.user = null;
     }
   } catch (error: any) {
-    console.error(error.message);
     req.user = null;
   }
 };
