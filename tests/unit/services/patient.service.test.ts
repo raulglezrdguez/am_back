@@ -164,7 +164,7 @@ describe("PatientService", () => {
     expect(patient.birthDate!.toString()).toBe(input.birthDate);
     expect(patient.sex).toBe(input.sex);
     expect(patient.public).toBe(input.public);
-    expect(patient.owner.toString()).toBe(user._id.toString());
+    expect(patient.owner._id.toString()).toBe(user._id.toString());
   });
 
   it("should update a patient", async () => {
