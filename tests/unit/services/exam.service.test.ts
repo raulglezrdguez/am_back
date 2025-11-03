@@ -12,7 +12,6 @@ import type {
   UpdateExamPropertiesInput,
 } from "../../../types/exam.d.ts";
 import { Answer, Operator } from "../../../types/exam_enums.ts";
-import e from "express";
 
 let mongoServer: MongoMemoryServer;
 
