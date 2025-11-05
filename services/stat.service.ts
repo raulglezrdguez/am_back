@@ -3,25 +3,41 @@ import Stat from "../models/stat.model.ts";
 import type {
   CreateStatInput,
   StatAnswer,
-  StatFilter,
+  StatFilterInput,
   StatResult,
 } from "../types/stat.d.ts";
 
 export const getStatById = async (id: string) =>
-  await Stat.findById(id).populate("exam").populate("author").lean();
+  await Stat.findById(id)
+    .populate("exam")
+    .populate("author")
+    .populate("patient")
+    .lean();
 
 export const getStatsByPatient = async (id: string) =>
-  await Stat.find({ patient: id }).populate("exam").populate("author").lean();
+  await Stat.find({ patient: id })
+    .populate("exam")
+    .populate("author")
+    .populate("patient")
+    .lean();
 
 export const getStatsByExam = async (id: string) =>
-  await Stat.find({ exam: id }).populate("exam").populate("author").lean();
+  await Stat.find({ exam: id })
+    .populate("exam")
+    .populate("author")
+    .populate("patient")
+    .lean();
 
-export const getStats = async (filter: StatFilter) => {
+export const getStats = async (filter: StatFilterInput) => {
   const mongoFilter: any = {};
 
   if (filter.examId) mongoFilter.exam = filter.examId;
   if (filter.resultValue) mongoFilter["result.value"] = filter.resultValue;
-  if (filter.address) mongoFilter.address = filter.address;
+  if (filter.address) {
+    mongoFilter.address = {};
+    mongoFilter.address["$regex"] = filter.address;
+    mongoFilter.address["$options"] = "i";
+  }
   if (filter.completedAt) {
     mongoFilter.completedAt = { $lte: new Date(filter.completedAt) };
   }
@@ -31,7 +47,7 @@ export const getStats = async (filter: StatFilter) => {
 
 export const createStat = async (input: CreateStatInput) => {
   const stat = await Stat.create({
-    id: crypto.randomUUID(),
+    // id: crypto.randomUUID(),
     exam: input.examId,
     patient: input.patientId,
     author: input.authorId,
