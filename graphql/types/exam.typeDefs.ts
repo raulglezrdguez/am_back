@@ -39,7 +39,7 @@ export const examTypeDefs = `#graphql
     }
 
     type Exam {
-        id: ID!
+        _id: ID!
         title: String!
         subtitle: String!
         instructions: String!

@@ -66,7 +66,7 @@ describe("Exam GraphQL", () => {
       expression: [],
       questions: [],
     });
-    const query = `{ exams { id title public author { name email } } }`;
+    const query = `{ exams { _id title public author { name email } } }`;
     const res = await request(server)
       .post("/graphql")
       .send(gql(query))
