@@ -1,5 +1,5 @@
 import * as statService from "../../services/stat.service.ts";
-import type { CreateStatInput, StatFilter } from "../../types/stat.d.ts";
+import type { CreateStatInput, StatFilterInput } from "../../types/stat.d.ts";
 
 import { type ApolloContext } from "../../config/apollo.context.ts";
 
@@ -32,7 +32,7 @@ export default {
       return statService.getStatsByExam(id);
     },
 
-    getStats: (_: any, { filter }: { filter: StatFilter }) =>
+    getStats: (_: any, { filter }: { filter: StatFilterInput }) =>
       statService.getStats(filter),
   },
 
