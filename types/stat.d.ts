@@ -18,7 +18,7 @@ export type CreateStatInput = {
   address?: string;
 };
 
-export type StatFilter = {
+export type StatFilterInput = {
   examId?: string;
   completedAt?: string;
   resultValue?: string;
