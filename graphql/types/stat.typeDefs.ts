@@ -10,7 +10,7 @@ export const statTypeDefs = `#graphql
     }
 
     type Stat {
-        id: ID!
+        _id: ID!
         exam: Exam!
         patient: Patient!
         author: User!
@@ -22,7 +22,7 @@ export const statTypeDefs = `#graphql
     }
 
     type StatOutput {
-        id: ID!
+        _id: ID!
         exam: Exam!
         author: User!
         completedAt: Date!
@@ -32,7 +32,7 @@ export const statTypeDefs = `#graphql
         address: String!
     }
 
-    type StatFilter {
+    input StatFilterInput {
         examId: ID
         completedAt: Date
         resultValue: String
@@ -41,18 +41,28 @@ export const statTypeDefs = `#graphql
 
     type Query {
         getStatById(id: ID!): Stat
-        getStatsByPatient(patientId: ID!): [Stat!]!
-        getStatsByExam(examId: ID!): [Stat!]!
+        getStatsByPatient(id: ID!): [Stat!]!
+        getStatsByExam(id: ID!): [Stat!]!
 
-        getStats(filter: StatFilter): [StatOutput!]!
+        getStats(filter: StatFilterInput): [StatOutput!]!
+    }
+
+    input StatResultInput {
+        value: String!
+        text: String!
+    }
+
+    input StatAnswerInput {
+        id: String!
+        answer: String!
     }
 
     input CreateStatInput {
         examId: ID!
         patientId: ID!
         completedAt: Date!
-        result: StatResult!
-        answers: [StatAnswer!]!
+        result: StatResultInput!
+        answers: [StatAnswerInput!]!
         address: String
     }
 
