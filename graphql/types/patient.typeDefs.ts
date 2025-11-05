@@ -5,7 +5,7 @@ export const patientTypeDefs = `#graphql
     }
 
     type Patient {
-        id: ID!
+        _id: ID!
         identifier: String!
         name: String!
         birthDate: BirthDate
@@ -24,7 +24,7 @@ export const patientTypeDefs = `#graphql
     }
 
     type PatientOutput {
-        id: ID!
+        _id: ID!
         identifier: String!
         name: String!
         birthDate: BirthDate

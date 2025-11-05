@@ -48,7 +48,7 @@ describe("Patient Resolvers", () => {
           gql(`
           query {
             patients {
-              id
+              _id
               identifier
               name
             }
@@ -104,7 +104,7 @@ describe("Patient Resolvers", () => {
           gql(`
           query {
             patients {
-              id
+              _id
               identifier
               name
             }
@@ -134,7 +134,7 @@ describe("Patient Resolvers", () => {
           gql(`
           query {
             patient(id: "${patient._id}") {
-              id
+              _id
               identifier
               name
             }
@@ -190,7 +190,7 @@ describe("Patient Resolvers", () => {
           gql(`
           query {
             patient(id: "${patient1._id}") {
-              id
+              _id
               identifier
               name
             }
@@ -242,7 +242,7 @@ describe("Patient Resolvers", () => {
           gql(`
           query {
             patient(id: "${patient2._id}") {
-              id
+              _id
               identifier
               name
             }
@@ -276,7 +276,7 @@ describe("Patient Resolvers", () => {
           gql(`
           query {
             patientBy(name: "John") {
-              id
+              _id
               identifier
               name
             }
@@ -296,7 +296,7 @@ describe("Patient Resolvers", () => {
           gql(`
           query {
             patientBy(identifier: "P002") {
-              id
+              _id
               identifier
               name
             }
@@ -312,7 +312,7 @@ describe("Patient Resolvers", () => {
           gql(`
           query {
             patientBy(name:"", identifier: "") {
-              id
+              _id
               identifier
               name
             }
@@ -354,7 +354,7 @@ describe("Patient Resolvers", () => {
               name: "John Doe",
               birthDate: "10-12-1980",
             }) {
-              id
+              _id
               identifier
               name
               birthDate
@@ -387,7 +387,7 @@ describe("Patient Resolvers", () => {
               name: "John Doe",
               birthDate: "10-12-1980",
             }) {
-              id
+              _id
               identifier
               name
               birthDate
@@ -428,7 +428,7 @@ describe("Patient Resolvers", () => {
               name: "John Doe",
               birthDate: "10-12-1980",
             }) {
-              id
+              _id
               identifier
               name
               birthDate
@@ -475,7 +475,7 @@ describe("Patient Resolvers", () => {
               name: "John Updated",
               public: true
             }) {
-              id
+              _id
               identifier
               name
               public
@@ -511,7 +511,7 @@ describe("Patient Resolvers", () => {
               name: "John Updated",
               public: true
             }) {
-              id
+              _id
               identifier
               name
               public
@@ -566,7 +566,7 @@ describe("Patient Resolvers", () => {
               name: "John Updated",
               public: true
             }) {
-              id
+              _id
               identifier
               name
               public
@@ -609,7 +609,7 @@ describe("Patient Resolvers", () => {
       const mutation = `
           mutation {
             deletePatient(id: "${patient._id}") {
-                id
+                _id
             }
           }
         `;
@@ -621,7 +621,7 @@ describe("Patient Resolvers", () => {
 
       const deletedPatient = res.body.data.deletePatient;
       expect(deletedPatient).toBeDefined();
-      expect(deletedPatient.id).toBe(patient._id.toString());
+      expect(deletedPatient._id).toBe(patient._id.toString());
     });
 
     it("should not delete patient if not authenticated", async () => {
@@ -635,7 +635,7 @@ describe("Patient Resolvers", () => {
       const mutation = `
           mutation {
             deletePatient(id: "${patient._id}") {
-                id
+                _id
             }
           }
         `;
@@ -683,7 +683,7 @@ describe("Patient Resolvers", () => {
       const mutation = `
           mutation {
             deletePatient(id: "${patient._id}") {
-                id
+                _id
             }
           }
         `;
