@@ -43,8 +43,6 @@ const verifyFirebaseToken = async (
     // Intenta ID token primero (más común)
     return await adminFirebase.auth().verifyIdToken(token);
   } catch (idTokenError) {
-    console.debug("Token no es ID token, probando session cookie...");
-
     try {
       return await adminFirebase.auth().verifySessionCookie(token);
     } catch (sessionError) {
