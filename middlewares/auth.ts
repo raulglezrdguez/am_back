@@ -4,6 +4,7 @@ import type { Request, Response, NextFunction } from "express";
 import { JWT_SECRET } from "../config/index.ts";
 import User from "../models/user.model.ts";
 import adminFirebase from "../config/admin.firebase.ts";
+import type { DecodedIdToken } from "firebase-admin/auth";
 
 // Verifica el token contra la base de datos local
 const verifyLocalUser = async (token: string, req: any) => {
@@ -35,6 +36,24 @@ const verifyLocalUser = async (token: string, req: any) => {
   }
 };
 
+const verifyFirebaseToken = async (
+  token: string
+): Promise<DecodedIdToken | null> => {
+  try {
+    // Intenta ID token primero (más común)
+    return await adminFirebase.auth().verifyIdToken(token);
+  } catch (idTokenError) {
+    console.debug("Token no es ID token, probando session cookie...");
+
+    try {
+      return await adminFirebase.auth().verifySessionCookie(token);
+    } catch (sessionError) {
+      console.error("Token inválido:", sessionError);
+      return null; // Ambos métodos fallaron
+    }
+  }
+};
+
 export async function authMiddleware(
   req: Request,
   res: Response,
@@ -57,6 +76,8 @@ export async function authMiddleware(
 
   const token = header.split(" ")[1];
 
+  console.log(token);
+
   try {
     await verifyLocalUser(token, req);
 
@@ -65,10 +86,7 @@ export async function authMiddleware(
     }
 
     // Verificar token de Firebase si es un token de Firebase
-    const firebaseUser = await adminFirebase
-      .auth()
-      .verifyIdToken(token)
-      .catch(() => null);
+    const firebaseUser = await verifyFirebaseToken(token);
 
     if (firebaseUser) {
       const dbUser = await User.findOne({ email: firebaseUser.email }).lean();
