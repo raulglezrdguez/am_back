@@ -74,8 +74,6 @@ export async function authMiddleware(
 
   const token = header.split(" ")[1];
 
-  console.log(token);
-
   try {
     await verifyLocalUser(token, req);
 
