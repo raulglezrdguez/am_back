@@ -128,6 +128,34 @@ export const updateExamQuestion = async (id: string, input: QuestionInput) => {
 
   return await exam.save();
 };
+export const updateExamQuestionId = async (
+  id: string,
+  questionId: string,
+  input: QuestionInput
+) => {
+  const exam = await Exam.findById(id);
+  if (!exam) throw new Error("Exam not found");
+
+  const question = exam.questions?.find((quest) => quest.id === questionId);
+  if (!question) throw new Error("Question not found in exam");
+
+  question.id = input.id;
+  question.text = input.text;
+  question.expression.id = input.expression.id;
+  question.expression.label = input.expression.label;
+  question.expression.operator = input.expression.operator;
+  question.expression.reference = input.expression.reference || "";
+  question.expression.value = input.expression.value;
+  question.expression.variable = input.expression.variable;
+  question.answer = input.answer;
+  question.reference = input.reference || "";
+  if (input.answers) {
+    question.answers?.splice(0, question.answers.length);
+    question.answers?.push(...input.answers);
+  }
+
+  return await exam.save();
+};
 
 // delete exam question
 export const deleteExamQuestion = async (id: string, questionId: string) => {

@@ -115,6 +115,24 @@ export default {
 
       return examService.updateExamQuestion(id, input);
     },
+    updateExamQuestionId: async (
+      _: any,
+      {
+        id,
+        questionId,
+        input,
+      }: { id: string; questionId: string; input: QuestionInput },
+      { currentUser }: ApolloContext
+    ) => {
+      if (!currentUser) throw new Error("Authentication required");
+
+      const exam = await examService.getExamById(id, currentUser.id);
+      if (!exam) throw new Error("Exam not found");
+      if (exam.author._id.toString() !== currentUser.id)
+        throw new Error("Not authorized to update question to this exam");
+
+      return examService.updateExamQuestionId(id, questionId, input);
+    },
     deleteExamQuestion: async (
       _: any,
       { id, questionId }: { id: string; questionId: string },

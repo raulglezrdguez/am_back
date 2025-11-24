@@ -6,11 +6,14 @@ const ObjectId = Schema.ObjectId;
 const operators = ["EQ", "NE", "LT", "GT", "LTE", "GTE"];
 const answers = ["RADIO", "TEXT", "NUMBER"];
 
-const AnswerOption = new Schema({
-  id: { type: String, required: true },
-  value: { type: String, required: true },
-  content: { type: String, required: true },
-});
+const AnswerOption = new Schema(
+  {
+    id: { type: String, required: true },
+    value: { type: String, required: true },
+    content: { type: String, required: true },
+  },
+  { _id: false }
+);
 
 const expressionSchema = new Schema(
   {
