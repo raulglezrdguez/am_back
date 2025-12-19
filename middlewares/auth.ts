@@ -40,6 +40,7 @@ const verifyFirebaseToken = async (
   token: string
 ): Promise<DecodedIdToken | null> => {
   try {
+    console.log("token recibida", token);
     // Intenta ID token primero (más común)
     return await adminFirebase.auth().verifyIdToken(token);
   } catch (idTokenError) {

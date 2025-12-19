@@ -1,6 +1,18 @@
 export const diagramTypeDefs = `#graphql
 
     scalar JSONObject
+
+    type Result {
+        label: String!
+        value: String!
+        reference: String
+    }
+
+    input ResultInput {
+        label: String!
+        value: String!
+        reference: String
+    }
     
     type NodePosition {
         x: Float!
@@ -41,6 +53,8 @@ export const diagramTypeDefs = `#graphql
         author: User!
 
         public: Boolean!
+
+        result: [Result]
         
         # Arrays de nodos y aristas
         nodes: [FlowNode!]!
@@ -83,6 +97,7 @@ export const diagramTypeDefs = `#graphql
         title: String!
         description: String!
         public: Boolean
+        result: [ResultInput]
         state: FlowStateInput
     }
 
@@ -90,6 +105,7 @@ export const diagramTypeDefs = `#graphql
         title: String
         description: String
         public: Boolean
+        result: [ResultInput]
         state: FlowStateInput
     }
 

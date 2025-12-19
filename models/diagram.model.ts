@@ -3,6 +3,15 @@ import mongoose from "mongoose";
 const { Schema } = mongoose;
 const ObjectId = Schema.ObjectId;
 
+const Result = new Schema(
+  {
+    label: { type: String, required: true },
+    value: { type: String, required: true },
+    reference: { type: String, required: false },
+  },
+  { _id: false }
+);
+
 const DiagramSchema = new Schema(
   {
     title: {
@@ -21,10 +30,11 @@ const DiagramSchema = new Schema(
       type: ObjectId,
       ref: "User",
       required: true,
-      index: true,
     },
 
     public: { type: Boolean, required: true, default: false },
+
+    result: { type: [Result], required: false },
 
     nodes: {
       type: [{}],
@@ -46,6 +56,8 @@ const DiagramSchema = new Schema(
   },
   { timestamps: true }
 );
+
+DiagramSchema.index({ author: 1 });
 
 DiagramSchema.index({ "nodes.type": 1 });
 /** ejemplo de uso:

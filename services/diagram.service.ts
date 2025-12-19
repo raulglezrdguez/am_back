@@ -1,11 +1,14 @@
 import Diagram from "../models/diagram.model.ts";
+import mongoose from "mongoose";
+
 import type {
   CreateDiagramInput,
   UpdateDiagramInput,
 } from "../types/diagram.d.ts";
 
 export const listDiagramsByAuthor = async (authorId: string) =>
-  await Diagram.find({ author: authorId }).populate("author", "name email");
+  await Diagram.find({}).populate("author", "name email");
+// await Diagram.find({ author: authorId }).populate("author", "name email");
 
 export const listPublicDiagrams = async () =>
   await Diagram.find({ public: true }).populate("author", "name email");
@@ -37,7 +40,11 @@ export const getDiagramById = async (id: string) => {
 };
 
 export const createDiagram = async (input: CreateDiagramInput) => {
-  const diagram = await Diagram.create(input);
+  const diagramInput = {
+    ...input,
+    author: new mongoose.Types.ObjectId(input.author),
+  };
+  const diagram = await Diagram.create(diagramInput);
   return diagram.populate("author", "name email");
 };
 
