@@ -353,4 +353,441 @@ describe("Diagram Resolvers", () => {
       expect(rootDiagram.author.email).toBe(normalUser.email);
     });
   });
+
+  describe("Mutation createDiagram", () => {
+    it("creates a new diagram", async () => {
+      const user = await User.create({
+        name: "Test User",
+        email: "test@gmail.com",
+        status: 1,
+        role: 1,
+      });
+
+      if (!JWT_SECRET) {
+        throw new Error("JWT_SECRET is not defined in environment variables");
+      }
+      const token = jwt.sign(
+        { id: user._id, email: user.email, status: 1, role: 1 },
+        JWT_SECRET
+      );
+
+      const mutation = `mutation {
+        createDiagram(input: {
+            title: "New Diagram",
+            description: "A newly created diagram",
+            public: true
+        }) {
+            _id
+            title
+            description
+            public
+            author {
+                id
+                email
+            }
+        }
+    }`;
+
+      const response = await request(server)
+        .post("/graphql")
+        .set("Authorization", `Bearer ${token}`)
+        .send(gql(mutation));
+
+      expect(response.status).toBe(200);
+      const createdDiagram = response.body.data.createDiagram;
+      expect(createdDiagram).toBeDefined();
+      expect(createdDiagram.title).toBe("New Diagram");
+      expect(createdDiagram.description).toBe("A newly created diagram");
+      expect(createdDiagram.public).toBe(true);
+      expect(createdDiagram.author.id).toBe(user._id.toString());
+      expect(createdDiagram.author.email).toBe(user.email);
+    });
+
+    it("fails to create diagram when not authenticated", async () => {
+      const mutation = `mutation {
+        createDiagram(input: {
+            title: "New Diagram",
+            description: "A newly created diagram",
+            public: true
+        }) {
+            _id
+            title
+            description
+            public
+            author {
+                id
+                email
+            }
+        }
+    }`;
+
+      const response = await request(server)
+        .post("/graphql")
+        .send(gql(mutation));
+
+      expect(response.status).toBe(200);
+      expect(response.body.errors).toBeDefined();
+      expect(response.body.errors[0].message).toBe("Authentication required");
+    });
+
+    it("fails to create diagram with invalid token", async () => {
+      const mutation = `mutation {
+        createDiagram(input: {
+            title: "New Diagram",
+            description: "A newly created diagram",
+            public: true
+        }) {
+            _id
+            title
+            description
+            public
+            author {
+                id
+                email
+            }
+        }
+    }`;
+
+      const response = await request(server)
+        .post("/graphql")
+        .set("Authorization", `Bearer invalidtoken`)
+        .send(gql(mutation));
+
+      expect(response.status).toBe(200);
+      expect(response.body.errors).toBeDefined();
+      expect(response.body.errors[0].message).toBe("Authentication required");
+    });
+
+    it("fails to create diagram when missing required fields", async () => {
+      const user = await User.create({
+        name: "Test User",
+        email: "test@gmail.com",
+        status: 1,
+        role: 1,
+      });
+
+      if (!JWT_SECRET) {
+        throw new Error("JWT_SECRET is not defined in environment variables");
+      }
+      const token = jwt.sign(
+        { id: user._id, email: user.email, status: 1, role: 1 },
+        JWT_SECRET
+      );
+
+      const mutation = `mutation {
+        createDiagram(input: {
+            description: "A newly created diagram without title",
+            public: true
+        }) {
+            _id
+            title
+            description
+            public
+            author {
+                id
+                email
+            }
+        }
+    }`;
+
+      const response = await request(server)
+        .post("/graphql")
+        .set("Authorization", `Bearer ${token}`)
+        .send(gql(mutation));
+
+      expect(response.status).toBe(400);
+      expect(response.body.errors).toBeDefined();
+      expect(response.body.errors[0].message).toContain(
+        'Field "CreateDiagramInput.title" of required type "String!" was not provided.'
+      );
+    });
+
+    it("fails to create diagram when user does not exist", async () => {
+      if (!JWT_SECRET) {
+        throw new Error("JWT_SECRET is not defined in environment variables");
+      }
+      const token = jwt.sign(
+        { id: "609e129e1c4ae12f34567890", email: "nonexistent@example.com" },
+        JWT_SECRET
+      );
+
+      const mutation = `mutation {
+        createDiagram(input: {
+            title: "New Diagram",
+            description: "A newly created diagram",
+            public: true
+        }) {
+            _id
+            title
+            description
+            public
+            author {
+                id
+                email
+            }
+        }
+    }`;
+
+      const response = await request(server)
+        .post("/graphql")
+        .set("Authorization", `Bearer ${token}`)
+        .send(gql(mutation));
+
+      expect(response.status).toBe(200);
+      expect(response.body.errors).toBeDefined();
+      expect(response.body.errors[0].message).toContain(
+        "Authentication required"
+      );
+    });
+  });
+
+  describe("Mutation updateDiagram", () => {
+    it("updates an existing diagram", async () => {
+      const user = await User.create({
+        name: "Test User",
+        email: "test@gmail.com",
+        status: 1,
+        role: 1,
+      });
+
+      const diagram = await Diagram.create({
+        title: "Old Diagram",
+        description: "An old diagram",
+        public: false,
+        author: user._id.toString(),
+      });
+
+      if (!JWT_SECRET) {
+        throw new Error("JWT_SECRET is not defined in environment variables");
+      }
+      const token = jwt.sign(
+        { id: user._id, email: user.email, status: 1, role: 1 },
+        JWT_SECRET
+      );
+
+      const mutation = `mutation {
+        updateDiagram(id: "${diagram._id.toString()}", input: {
+            title: "Updated Diagram",
+            description: "An updated diagram",
+            public: true
+        }) {
+            _id
+            title
+            description
+            public
+            author {
+                id
+                email
+            }
+        }
+    }`;
+
+      const response = await request(server)
+        .post("/graphql")
+        .set("Authorization", `Bearer ${token}`)
+        .send(gql(mutation));
+
+      expect(response.status).toBe(200);
+      const updatedDiagram = response.body.data.updateDiagram;
+      expect(updatedDiagram).toBeDefined();
+      expect(updatedDiagram.title).toBe("Updated Diagram");
+      expect(updatedDiagram.description).toBe("An updated diagram");
+      expect(updatedDiagram.public).toBe(true);
+      expect(updatedDiagram.author.id).toBe(user._id.toString());
+      expect(updatedDiagram.author.email).toBe(user.email);
+    });
+
+    it("fails to update diagram when not authenticated", async () => {
+      const mutation = `mutation {
+        updateDiagram(id: "609e129e1c4ae12f34567890", input: {
+            title: "Updated Diagram",
+            description: "An updated diagram",
+            public: true
+        }) {
+            _id
+            title
+            description
+            public
+            author {
+                id
+                email
+            }
+        }
+    }`;
+
+      const response = await request(server)
+        .post("/graphql")
+        .send(gql(mutation));
+
+      expect(response.status).toBe(200);
+      expect(response.body.errors).toBeDefined();
+      expect(response.body.errors[0].message).toBe("Authentication required");
+    });
+  });
+
+  describe("Mutation deleteDiagram", () => {
+    it("deletes an existing diagram", async () => {
+      const user = await User.create({
+        name: "Test User",
+        email: "test@example.com",
+        status: 1,
+        role: 1,
+      });
+
+      const diagram = await Diagram.create({
+        title: "Old Diagram",
+        description: "An old diagram",
+        public: false,
+        author: user._id.toString(),
+      });
+
+      if (!JWT_SECRET) {
+        throw new Error("JWT_SECRET is not defined in environment variables");
+      }
+      const token = jwt.sign(
+        { id: user._id, email: user.email, status: 1, role: 1 },
+        JWT_SECRET
+      );
+
+      const mutation = `mutation {
+        deleteDiagram(id: "${diagram._id.toString()}") {
+            _id
+            title
+            description
+            public
+            author {
+                id
+                email
+            }
+        }
+    }`;
+
+      const response = await request(server)
+        .post("/graphql")
+        .set("Authorization", `Bearer ${token}`)
+        .send(gql(mutation));
+
+      expect(response.status).toBe(200);
+      const deletedDiagram = response.body.data.deleteDiagram;
+      expect(deletedDiagram).toBeDefined();
+      expect(deletedDiagram._id).toBe(diagram._id.toString());
+    });
+
+    it("fails to delete diagram when not authenticated", async () => {
+      const mutation = `mutation {
+        deleteDiagram(id: "609e129e1c4ae12f34567890") {
+            _id
+            title
+            description
+            public
+            author {
+                id
+                email
+            }
+        }
+    }`;
+
+      const response = await request(server)
+        .post("/graphql")
+        .send(gql(mutation));
+
+      expect(response.status).toBe(200);
+      expect(response.body.errors).toBeDefined();
+      expect(response.body.errors[0].message).toBe("Authentication required");
+    });
+
+    it("fails to delete diagram when not found", async () => {
+      const user = await User.create({
+        name: "Test User",
+        email: "test@gmail.com",
+        status: 1,
+        role: 1,
+      });
+
+      if (!JWT_SECRET) {
+        throw new Error("JWT_SECRET is not defined in environment variables");
+      }
+      const token = jwt.sign(
+        { id: user._id, email: user.email, status: 1, role: 1 },
+        JWT_SECRET
+      );
+
+      const mutation = `mutation {
+        deleteDiagram(id: "609e129e1c4ae12f34567890") {
+            _id
+            title
+            description
+            public
+            author {
+                id
+                email
+            }
+        }
+    }`;
+
+      const response = await request(server)
+        .post("/graphql")
+        .set("Authorization", `Bearer ${token}`)
+        .send(gql(mutation));
+
+      expect(response.status).toBe(200);
+      expect(response.body.errors).toBeDefined();
+      expect(response.body.errors[0].message).toBe("Diagram not found");
+    });
+
+    it("fails to delete diagram when user is not the author", async () => {
+      const authorUser = await User.create({
+        name: "Author User",
+        email: "author@example.com",
+        status: 1,
+        role: 1,
+      });
+
+      const otherUser = await User.create({
+        name: "Other User",
+        email: "other@example.com",
+        status: 1,
+        role: 1,
+      });
+
+      const diagram = await Diagram.create({
+        title: "Test Diagram",
+        description: "A test diagram",
+        public: false,
+        author: authorUser._id.toString(),
+      });
+
+      if (!JWT_SECRET) {
+        throw new Error("JWT_SECRET is not defined in environment variables");
+      }
+      const token = jwt.sign(
+        { id: otherUser._id, email: otherUser.email, status: 1, role: 1 },
+        JWT_SECRET
+      );
+
+      const mutation = `mutation {
+        deleteDiagram(id: "${diagram._id.toString()}") {
+            _id
+            title
+            description
+            public
+            author {
+                id
+                email
+            }
+        }
+    }`;
+
+      const response = await request(server)
+        .post("/graphql")
+        .set("Authorization", `Bearer ${token}`)
+        .send(gql(mutation));
+
+      expect(response.status).toBe(200);
+      expect(response.body.errors).toBeDefined();
+      expect(response.body.errors[0].message).toBe(
+        "Not authorized to delete this diagram"
+      );
+    });
+  });
 });

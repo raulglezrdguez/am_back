@@ -79,36 +79,34 @@ export const diagramTypeDefs = `#graphql
         viewport: FlowViewportInput
     }
 
+    input CreateDiagramInput {
+        title: String!
+        description: String!
+        public: Boolean
+        state: FlowStateInput
+    }
+
+    input UpdateDiagramInput {
+        title: String
+        description: String
+        public: Boolean
+        state: FlowStateInput
+    }
+
     type Mutation {
         # Crear un nuevo diagrama
-        createDiagram(
-            userId: ID!
-            title: String!
-            description: String!
-            public: Boolean
-            state: FlowStateInput!
-        ): Diagram!
+        createDiagram(input: CreateDiagramInput!): Diagram!
 
         # Actualizar un diagrama existente
-        updateDiagram(
-            id: ID!
-            userId: ID!
-            title: String
-            description: String
-            public: Boolean
-            state: FlowStateInput!
-        ): Diagram!
+        updateDiagram(id: ID!, input: UpdateDiagramInput!): Diagram!
 
         # Eliminar un diagrama
-        deleteDiagram(id: ID!, userId: ID!): Diagram!
+        deleteDiagram(id: ID!): Diagram!
 
         # Modificar un diagrama como usuario root
         rootUpdateDiagram(
             id: ID!
-            title: String
-            description: String
-            public: Boolean
-            state: FlowStateInput!
+            input: UpdateDiagramInput!
         ): Diagram!
 
         # Eliminar un diagrama como usuario root

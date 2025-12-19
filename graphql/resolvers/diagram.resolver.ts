@@ -69,11 +69,10 @@ export default {
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
-      const diagram = await diagramService.getDiagramByAuthorId(
-        id,
-        currentUser.id
-      );
+      const diagram = await diagramService.getDiagramById(id);
       if (!diagram) throw new Error("Diagram not found");
+      if (diagram.author._id.toString() !== currentUser.id)
+        throw new Error("Not authorized to delete this diagram");
 
       return diagramService.deleteDiagram(id);
     },

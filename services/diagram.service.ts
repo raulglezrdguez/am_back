@@ -41,12 +41,14 @@ export const createDiagram = async (input: CreateDiagramInput) => {
   return diagram.populate("author", "name email");
 };
 
-export const updateDiagram = async (id: string, input: UpdateDiagramInput) =>
-  await Diagram.findByIdAndUpdate(id, input, { new: true });
+export const updateDiagram = async (id: string, input: UpdateDiagramInput) => {
+  const diagram = await Diagram.findByIdAndUpdate(id, input, { new: true });
+  return diagram?.populate("author", "name email");
+};
 
 export const deleteDiagram = async (id: string) => {
   const diagram = await Diagram.findByIdAndDelete(id);
-  return diagram;
+  return diagram?.populate("author", "name email");
 };
 
 export const findDiagramsByNodeType = async (nodeType: string) => {
