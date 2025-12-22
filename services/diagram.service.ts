@@ -7,8 +7,7 @@ import type {
 } from "../types/diagram.d.ts";
 
 export const listDiagramsByAuthor = async (authorId: string) =>
-  await Diagram.find({}).populate("author", "name email");
-// await Diagram.find({ author: authorId }).populate("author", "name email");
+  await Diagram.find({ author: authorId }).populate("author", "name email");
 
 export const listPublicDiagrams = async () =>
   await Diagram.find({ public: true }).populate("author", "name email");
