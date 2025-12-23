@@ -199,13 +199,13 @@ describe("Diagram service", () => {
       public: false,
       author: user._id.toString(),
     });
-    const diagrams = await diagramService.getDiagramByAuthorId(
+    const result = await diagramService.getDiagramByAuthorId(
       diagram._id.toString(),
       user._id.toString()
     );
-    expect(diagrams.length).toBe(1);
-    expect(diagrams[0].title).toBe("GetByAuthorId Diagram");
-    expect(diagrams[0].author._id.toString()).toBe(user._id.toString());
+    expect(result).toBeDefined();
+    expect(result?.title).toBe("GetByAuthorId Diagram");
+    expect(result?.author._id.toString()).toBe(user._id.toString());
   });
 
   it("should get public diagram by id", async () => {
@@ -227,12 +227,12 @@ describe("Diagram service", () => {
       public: false,
       author: user._id.toString(),
     });
-    const diagrams = await diagramService.getPublicDiagramById(
+    const result = await diagramService.getPublicDiagramById(
       diagram._id.toString()
     );
-    expect(diagrams.length).toBe(1);
-    expect(diagrams[0].title).toBe("GetPublicById Diagram");
-    expect(diagrams[0].author._id.toString()).toBe(user._id.toString());
+    expect(result).toBeDefined();
+    expect(result?.title).toBe("GetPublicById Diagram");
+    expect(result?.author._id.toString()).toBe(user._id.toString());
   });
 
   it("should get all diagrams", async () => {
