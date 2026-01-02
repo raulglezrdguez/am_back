@@ -87,18 +87,14 @@ export const diagramTypeDefs = `#graphql
         zoom: Float
     }
 
-    input FlowStateInput {
-        nodes: [JSONObject!]! # Usamos JSONObject porque la entrada es compleja y variada
-        edges: [JSONObject!]!
-        viewport: FlowViewportInput
-    }
-
     input CreateDiagramInput {
         title: String!
         description: String!
         public: Boolean
         result: [ResultInput]
-        state: FlowStateInput
+        nodes: [JSONObject!]! # Usamos JSONObject porque la entrada es compleja y variada
+        edges: [JSONObject!]!
+        viewport: FlowViewportInput
     }
 
     input UpdateDiagramInput {
@@ -106,7 +102,9 @@ export const diagramTypeDefs = `#graphql
         description: String
         public: Boolean
         result: [ResultInput]
-        state: FlowStateInput
+        nodes: [JSONObject!]! # Usamos JSONObject porque la entrada es compleja y variada
+        edges: [JSONObject!]!
+        viewport: FlowViewportInput
     }
 
     type Mutation {

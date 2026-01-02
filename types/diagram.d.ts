@@ -11,6 +11,10 @@ export type DiagramNode = {
     x: number;
     y: number;
   };
+  measured: {
+    width: number;
+    height: number;
+  };
   data?: Record<string, any>;
 };
 
