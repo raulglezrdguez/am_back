@@ -46,6 +46,14 @@ pnpm install
 
 ### 3. Setup environment variables
 
+Create a base64 string from your firebase configuration project file with sensitive information to put in your .env file.
+
+In linux and macOS:
+
+```bash
+base64 -i firebase-admin.json
+```
+
 Create a .env file in the root directory.
 
 ```bash
@@ -62,9 +70,7 @@ MONGODB_URI=mongodb://localhost:27017/your-database-name
 JWT_SECRET=your-super-secret-jwt-key-min-32-chars
 
 # Firebase (download from Firebase Console)
-FIREBASE_PROJECT_ID=your-project-id
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-FIREBASE_CLIENT_EMAIL=your-client-email@project.iam.gserviceaccount.com
+FIREBASE_SERVICE_ACCOUNT=your-base64-string-from-file-firebase-admin.json
 
 ```
 
