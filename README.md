@@ -30,8 +30,8 @@ Deployed in [`https://amback-production.up.railway.app/graphql`](https://amback-
 ### 1. Clone the repository
 
 ```bash
-git clone &lt;repository-url&gt;
-cd &lt;project-directory&gt;
+git clone https://github.com/raulglezrdguez/am_back.git
+cd back
 ```
 
 ### 2. Install dependencies
