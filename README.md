@@ -179,4 +179,4 @@ GET /health
 
 This project is licensed under the [MIT License](https://opensource.org/licenses/MIT) - see the LICENSE file for details.
 
-Built with ❤️ using modern backend technologies
+GraphQL API server built with ❤️ and modern backend technologies.
