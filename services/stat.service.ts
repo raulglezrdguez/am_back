@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { escapeRegex } from "./utils.ts";
 import Stat from "../models/stat.model.ts";
 import type {
   CreateStatInput,
@@ -35,7 +36,7 @@ export const getStats = async (filter: StatFilterInput) => {
   if (filter.resultValue) mongoFilter["result.value"] = filter.resultValue;
   if (filter.address) {
     mongoFilter.address = {};
-    mongoFilter.address["$regex"] = filter.address;
+    mongoFilter.address["$regex"] = escapeRegex(filter.address);
     mongoFilter.address["$options"] = "i";
   }
   if (filter.completedAt) {
@@ -61,7 +62,7 @@ export const createStat = async (input: CreateStatInput) => {
         ({
           id: ans.id,
           answer: ans.answer,
-        } as StatAnswer)
+        }) as StatAnswer,
     ),
     address: input.address,
   });

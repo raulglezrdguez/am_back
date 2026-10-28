@@ -17,8 +17,8 @@ export const patientTypeDefs = `#graphql
         medicalHistory: String
         allergies: [String!]
         medications: [String!]
-        public: Boolean!
         owner: User!
+        sharedWith: [User!]
         createdAt: Date!
         updatedAt: Date!
     }
@@ -36,14 +36,22 @@ export const patientTypeDefs = `#graphql
         medicalHistory: String
         allergies: [String!]
         medications: [String!]
-        public: Boolean!
         owner: User!
+        sharedWith: [User!]
     }
 
     type Query {
         patients: [PatientOutput!]!
+        sharedPatients: [PatientOutput!]!
+        allPatients: [PatientOutput!]!
+
         patient(id: ID!): PatientOutput
+        sharedPatient(id: ID!): PatientOutput
+        allPatient(id: ID!): PatientOutput
+
         patientBy(name: String, identifier: String): [PatientOutput!]!
+        sharedPatientBy(name: String, identifier: String): [PatientOutput!]!
+        allPatientBy(name: String, identifier: String): [PatientOutput!]!
     }
 
     input CreatePatientInput {
@@ -72,14 +80,15 @@ export const patientTypeDefs = `#graphql
         medicalHistory: String
         allergies: [String!]
         medications: [String!]
-        public: Boolean
     }
 
     type Mutation {
         createPatient(input: CreatePatientInput!): PatientOutput
 
         updatePatient(id: ID!, input: UpdatePatientInput!): PatientOutput
+        sharePatient(id: ID!, userId: ID!): PatientOutput
 
         deletePatient(id: ID!): PatientOutput!
+        deleteSharedPatient(id: ID!, userId: ID!): PatientOutput
     }
 `;
