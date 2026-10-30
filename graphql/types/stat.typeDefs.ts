@@ -29,7 +29,7 @@ export const statTypeDefs = `#graphql
         result: StatResult!
         answers: [StatAnswer!]!
         createdAt: String!
-        address: String!
+        address: String
     }
 
     input StatFilterInput {

@@ -29,8 +29,21 @@ export const getStatsByExam = async (id: string) =>
     .populate("patient")
     .lean();
 
-export const getStats = async (filter: StatFilterInput) => {
+export type StatListOptions = {
+  userId: string;
+  isAdmin: boolean;
+  limit?: number;
+  skip?: number;
+};
+
+export const getStats = async (
+  filter: StatFilterInput,
+  options: StatListOptions,
+) => {
+  const { userId, isAdmin, limit = 50, skip = 0 } = options;
   const mongoFilter: any = {};
+
+  if (!isAdmin) mongoFilter.author = userId;
 
   if (filter.examId) mongoFilter.exam = filter.examId;
   if (filter.resultValue) mongoFilter["result.value"] = filter.resultValue;
@@ -43,7 +56,12 @@ export const getStats = async (filter: StatFilterInput) => {
     mongoFilter.completedAt = { $lte: new Date(filter.completedAt) };
   }
 
-  return Stat.find(mongoFilter).populate("exam").populate("author").lean();
+  return Stat.find(mongoFilter)
+    .populate("exam", "title subtitle year")
+    .populate("author", "name")
+    .skip(skip)
+    .limit(Math.min(limit, 100))
+    .lean();
 };
 
 export const createStat = async (input: CreateStatInput) => {

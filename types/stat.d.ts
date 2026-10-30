@@ -33,7 +33,7 @@ export type StatOutput = {
   result: StatResult;
   answers: StatAnswer[];
   createdAt: string;
-  address: string;
+  address?: string;
 };
 
 export type Stat = {

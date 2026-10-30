@@ -22,7 +22,12 @@ const statSchema = new Schema(
     address: { type: String, required: false },
     createdAt: { type: Date, default: Date.now },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
+
+statSchema.index({ author: 1 });
+statSchema.index({ exam: 1 });
+statSchema.index({ patient: 1 });
+statSchema.index({ completedAt: -1 });
 
 export default mongoose.model("Stat", statSchema);
