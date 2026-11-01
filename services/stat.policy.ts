@@ -1,5 +1,3 @@
-import type { User } from "../config/apollo.context.ts"; // ajusta el tipo si difiere
-
 export class NotFoundError extends Error {
   constructor(message = "Resource not found") {
     super(message);
