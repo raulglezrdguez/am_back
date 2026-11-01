@@ -6,6 +6,16 @@ import User from "../models/user.model.ts";
 import adminFirebase from "../config/admin.firebase.ts";
 import type { DecodedIdToken } from "firebase-admin/auth";
 
+const audit = (event: string, data: Record<string, unknown>) => {
+  console.info(
+    JSON.stringify({
+      timestamp: new Date().toISOString(),
+      event,
+      ...data,
+    }),
+  );
+};
+
 // Verifica el token contra la base de datos local
 const verifyLocalUser = async (token: string, req: any) => {
   try {
@@ -37,17 +47,31 @@ const verifyLocalUser = async (token: string, req: any) => {
 };
 
 const verifyFirebaseToken = async (
-  token: string
+  token: string,
 ): Promise<DecodedIdToken | null> => {
   try {
-    // Intenta ID token primero (más común)
-    return await adminFirebase.auth().verifyIdToken(token);
-  } catch (idTokenError) {
+    // checkRevoked = true: rechaza tokens de usuarios deshabilitados o sesiones revocadas
+    return await adminFirebase.auth().verifyIdToken(token, true);
+  } catch (idTokenError: any) {
+    // Si el token fue revocado explícitamente, no intentes session cookie
+    if (idTokenError?.code === "auth/id-token-revoked") {
+      audit("auth.firebase.token_revoked", { tokenType: "id_token" });
+      return null;
+    }
     try {
-      return await adminFirebase.auth().verifySessionCookie(token);
-    } catch (sessionError) {
-      console.error("Token inválido:", sessionError);
-      return null; // Ambos métodos fallaron
+      // checkRevoked = true para session cookies también
+      return await adminFirebase.auth().verifySessionCookie(token, true);
+    } catch (sessionError: any) {
+      if (sessionError?.code === "auth/session-cookie-revoked") {
+        audit("auth.firebase.session_cookie_revoked", {
+          tokenType: "id_token",
+        });
+      } else {
+        audit("auth.firebase.session.invalid_token", {
+          error: sessionError?.code,
+        });
+      }
+      return null;
     }
   }
 };
@@ -55,7 +79,7 @@ const verifyFirebaseToken = async (
 export async function authMiddleware(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) {
   if ((global as any).__TEST_TEAR_DOWN__) {
     return res.status(503).end(); // servidor cerrado
@@ -85,6 +109,13 @@ export async function authMiddleware(
     const firebaseUser = await verifyFirebaseToken(token);
 
     if (firebaseUser) {
+      // bloquear cualquier operación con email no verificado
+      if (!firebaseUser.email_verified) {
+        audit("auth.firebase.unverified_email", { email: firebaseUser.email });
+        req.user = null;
+        return next();
+      }
+
       const dbUser = await User.findOne({ email: firebaseUser.email }).lean();
       if (dbUser) {
         if (dbUser.status === 1) {
@@ -103,16 +134,10 @@ export async function authMiddleware(
           name: firebaseUser.name,
           email: firebaseUser.email,
           role: 1,
-          status: 1,
+          status: 0, // ⚠️ inactivo hasta aprobación manual
         });
 
-        req.user = {
-          id: newDbUser._id.toString(),
-          name: newDbUser.name,
-          email: newDbUser.email,
-          role: 1,
-          status: 1,
-        };
+        req.user = null;
       } else {
         req.user = null;
       }
