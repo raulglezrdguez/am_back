@@ -29,7 +29,8 @@
     "mongodb-memory-server": "^10.2.3",
     "mongoose": "^8.19.1",
     "pino": "^10.1.0",
-    "supertest": "^7.1.4"
+    "supertest": "^7.1.4",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@babel/core": "^7.28.5",

@@ -20,7 +20,9 @@ const audit = (event: string, data: Record<string, unknown>) => {
 const verifyLocalUser = async (token: string, req: any) => {
   try {
     if (!JWT_SECRET) {
-      throw new Error("JWT_SECRET is not defined in environment variables");
+      throw new Error(
+        "JWT_SECRET missing — this should have failed at startup",
+      );
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;

@@ -1,26 +1,32 @@
 import { ApolloServer } from "@apollo/server";
 import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHttpServer";
 import { ApolloServerPluginLandingPageLocalDefault } from "@apollo/server/plugin/landingPage/default";
+// import { ApolloServerPluginLandingPageProductionDefault } from "@apollo/server/plugin/landingPage/default";
+import { ApolloServerPluginLandingPageDisabled } from "@apollo/server/plugin/disabled";
 import { typeDefs } from "../graphql/types/index.ts";
 import { resolvers } from "../graphql/resolvers/index.ts";
 import { type ApolloContext } from "./apollo.context.ts";
+import { IS_PRODUCTION } from "./index.ts";
 
 export function createApolloServer(httpServer: any) {
   return new ApolloServer<ApolloContext>({
     typeDefs,
     resolvers,
+    // Desactiva introspección en producción
+    introspection: !IS_PRODUCTION,
     plugins: [
-      // Permite que Apollo se cierre cuando paremos el httpServer
       ApolloServerPluginDrainHttpServer({ httpServer }),
-      // En prod puedes cambiarlo por ApolloServerPluginLandingPageProductionDefault
-      process.env.NODE_ENV === "production"
-        ? ApolloServerPluginLandingPageLocalDefault({ embed: false })
+      // landing page: deshabilitada en produccion
+      IS_PRODUCTION
+        ? ApolloServerPluginLandingPageDisabled()
         : ApolloServerPluginLandingPageLocalDefault({ embed: true }),
+      // Landing page: producción usa ProductionDefault (sin Sandbox embebido)
+      // IS_PRODUCTION
+      //   ? ApolloServerPluginLandingPageProductionDefault({ embed: false })
+      //   : ApolloServerPluginLandingPageLocalDefault({ embed: true }),
     ],
-    // Opcional: formatea errores antes de enviarlos al cliente
     formatError: (err) => {
-      // Quita el stack en producción
-      if (process.env.NODE_ENV === "production") {
+      if (IS_PRODUCTION) {
         delete err.extensions?.stacktrace;
       }
       return err;
