@@ -2,9 +2,9 @@
 
 A production-ready GraphQL API built with Apollo Server, Express and MongoDB, featuring JWT authentication, Firebase integration and comprehensive testing.
 
-## Deployed
+## Deployment
 
-Deployed in [`https://amback-production.up.railway.app/graphql`](https://amback-production.up.railway.app/graphql)
+This API is deployed to a private environment. Access is restricted to authorized clients.
 
 ## Features
 
@@ -58,21 +58,23 @@ Create a .env file in the root directory.
 
 ```bash
 # Server
-PORT=4000
+PORT=5050
 NODE_ENV=development
 
 # Database
-MONGODB_URI=mongodb://localhost:27017/your-database-name
+MONGO_URI=mongodb://localhost:27017/your-database-name
 # or for MongoDB Atlas
-# MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.xxx.mongodb.net/<database-name>
+# MONGO_URI=mongodb+srv://<username>:<password>@cluster0.xxx.mongodb.net/<database-name>
 
 # JWT
-JWT_SECRET=your-super-secret-jwt-key-min-32-chars
+JWT_SECRET=<generate with: openssl rand -base64 48>
 
 # Firebase (download from Firebase Console)
-FIREBASE_SERVICE_ACCOUNT=your-base64-string-from-file-firebase-admin.json
+FIREBASE_SERVICE_ACCOUNT=<base64 of service-account.json — see steps below>
 
 ```
+
+> 🔐 Never commit your `firebase-admin.json` or the base64 string. Rotate the service account key immediately if it leaks.
 
 ### 4. Running the backend
 
@@ -118,7 +120,7 @@ Test features
 - Coverage: Comprehensive coverage reporting
 - Open Handles Detection: Detects resource leaks in tests
 
-## Avalilable scripts
+## Available scripts
 
 | Script              | Description                              |
 | ------------------- | ---------------------------------------- |
@@ -128,7 +130,7 @@ Test features
 | `npm run test:unit` | Run unit tests only                      |
 | `npm run test:int`  | Run integration tests only               |
 
-## Api endpoints
+## API endpoints
 
 GraphQL endpoint
 
@@ -163,13 +165,18 @@ GET /health
 | **Logging**     | Pino                       |
 | **Security**    | express-rate-limit, cors   |
 
-## Security features
+### Security features
 
-- Rate Limiting: Prevents brute force attacks
-- CORS: Configured origin whitelist
-- JWT Tokens: Stateless authentication
-- Password Hashing: bcrypt with salt rounds
-- Firebase Rules: Leverages Firebase security model
+- **Fail-fast environment validation**: app refuses to start without `MONGO_URI`, `JWT_SECRET` (≥32 chars) and `FIREBASE_SERVICE_ACCOUNT`
+- **JWT authentication**: stateless, HS256 with validated secret
+- **Firebase email verification**: unverified emails are rejected before provisioning
+- **Token revocation checks**: `verifyIdToken`/`verifySessionCookie` run with `checkRevoked: true`
+- **No auto-provisioning**: new Firebase users are created with `status: 0` pending manual approval
+- **IDOR protections**: all resource queries are scoped by `author`, returning `NOT_FOUND` for foreign resources
+- **Rate limiting**: prevents brute force and enumeration
+- **CORS**: strict origin whitelist
+- **Introspection & playground disabled in production**
+- **Password hashing**: bcrypt with salt rounds
 
 ## Contributing
 
