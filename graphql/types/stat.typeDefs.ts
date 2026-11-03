@@ -41,10 +41,10 @@ export const statTypeDefs = `#graphql
 
     type Query {
         getStatById(id: ID!): Stat
-        getStatsByPatient(id: ID!): [Stat!]!
-        getStatsByExam(id: ID!): [Stat!]!
+        getStatsByPatient(id: ID!): [Stat!]! 
+        getStatsByExam(id: ID!): [Stat!]! 
 
-        getStats(filter: StatFilterInput): [StatOutput!]!
+        getStats(filter: StatFilterInput): [StatOutput!]! 
     }
 
     input StatResultInput {

@@ -12,13 +12,17 @@ import { authMiddleware } from "./middlewares/auth.ts";
 import apiRoutes from "./api/routes/index.ts";
 
 import { loggerMiddleware } from "./middlewares/logger.ts";
-import { rateLimitMiddleware } from "./middlewares/rateLimit.ts";
+import {
+  graphqlRateLimit,
+  rateLimitMiddleware,
+} from "./middlewares/rateLimit.ts";
 import { errorHandler } from "./middlewares/errorHandler.ts";
 import { type ApolloContext } from "./config/apollo.context.ts";
 
 await connectDB();
 
 export const app = express();
+app.set("trust proxy", 1);
 const httpServer = http.createServer(app);
 
 const apolloServer: ApolloServer<ApolloContext> =
@@ -32,9 +36,10 @@ app.use(
   "/graphql",
   cors<cors.CorsRequest>(),
   authMiddleware,
+  graphqlRateLimit,
   expressMiddleware(apolloServer, {
     context: async ({ req }) => ({ currentUser: req.user }),
-  })
+  }),
 );
 
 app.use(apiRoutes);

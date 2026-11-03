@@ -35,32 +35,41 @@ export default {
       _: any,
       { id }: { id: string },
       { currentUser }: ApolloContext,
-    ) => wrap(() => statService.getStatById(id, toActor(currentUser))),,
+    ) => wrap(() => statService.getStatById(id, toActor(currentUser))),
 
-    getStatsByPatient: (
-      _: any,
-      { id }: { id: string },
-      { currentUser }: ApolloContext,
-    ) => wrap(() => statService.getStatsByPatient(id, toActor(currentUser))),
+    getStatsByPatient: {
+      resolve: (
+        _: any,
+        { id }: { id: string },
+        { currentUser }: ApolloContext,
+      ) => wrap(() => statService.getStatsByPatient(id, toActor(currentUser))),
+      extensions: { complexity: 5 },
+    },
 
-    getStatsByExam: (
-      _: any,
-      { id }: { id: string },
-      { currentUser }: ApolloContext,
-    ) => wrap(() => statService.getStatsByExam(id, toActor(currentUser))),
+    getStatsByExam: {
+      resolve: (
+        _: any,
+        { id }: { id: string },
+        { currentUser }: ApolloContext,
+      ) => wrap(() => statService.getStatsByExam(id, toActor(currentUser))),
+      extensions: { complexity: 5 },
+    },
 
-    getStats: (
-      _: any,
-      { filter }: { filter: StatFilterInput },
-      { currentUser }: ApolloContext,
-    ) =>
-      wrap(() =>
-        statService.getStats(filter || {}, {
-          actor: toActor(currentUser),
-          limit: 50,
-          skip: 0,
-        }),
-      ),
+    getStats: {
+      resolve: (
+        _: any,
+        { filter }: { filter: StatFilterInput },
+        { currentUser }: ApolloContext,
+      ) =>
+        wrap(() =>
+          statService.getStats(filter || {}, {
+            actor: toActor(currentUser),
+            limit: 50,
+            skip: 0,
+          }),
+        ),
+      extensions: { complexity: 5 },
+    },
   },
 
   Mutation: {

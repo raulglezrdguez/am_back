@@ -15,6 +15,7 @@ const envSchema = z.object({
   FIREBASE_SERVICE_ACCOUNT: z
     .string()
     .min(1, "FIREBASE_SERVICE_ACCOUNT is required"),
+  REDIS_URL: z.string().url("REDIS_URL must be a valid Redis connection URL"),
 });
 
 const parsed = envSchema.safeParse(process.env);
