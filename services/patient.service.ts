@@ -1,5 +1,6 @@
 import Patient from "../models/patient.model.ts";
 import User from "../models/user.model.ts";
+import { UPDATE_OPTS, UPDATE_OPTS_WITH_SETTERS } from "./utils.ts";
 
 import type {
   CreatePatientInput,
@@ -248,38 +249,29 @@ export const updatePatient = async (
   ownerId: string,
   input: Partial<UpdatePatientInput>,
 ) => {
-  const {
-    identifier,
-    name,
-    birthDate,
-    sex,
-    address,
-    phone,
-    email,
-    emergencyContact,
-    medicalHistory,
-    allergies,
-    medications,
-  } = input;
-
-  const sanitized = {
-    identifier,
-    name,
-    birthDate,
-    sex,
-    address,
-    phone,
-    email,
-    emergencyContact,
-    medicalHistory,
-    allergies,
-    medications,
-  };
+  // Sanitización explícita: solo campos permitidos (evita mass assignment).
+  const sanitized: Partial<UpdatePatientInput> = {};
+  const ALLOWED: (keyof UpdatePatientInput)[] = [
+    "identifier",
+    "name",
+    "birthDate",
+    "sex",
+    "address",
+    "phone",
+    "email",
+    "emergencyContact",
+    "medicalHistory",
+    "allergies",
+    "medications",
+  ];
+  for (const key of ALLOWED) {
+    if (input[key] !== undefined) (sanitized as any)[key] = input[key];
+  }
 
   const patient = await Patient.findOneAndUpdate(
     { _id: id, owner: ownerId },
     sanitized,
-    { new: true, runValidators: true },
+    UPDATE_OPTS_WITH_SETTERS, // ← runValidators + runSettersOnQuery
   )
     .select(PATIENT_SELECT)
     .populate("owner", "name")
@@ -294,7 +286,8 @@ export const deletePatient = async (id: string, ownerId: string) => {
   const patient = await Patient.findOne({ _id: id, owner: ownerId })
     .select(PATIENT_SELECT)
     .populate("owner", "name")
-    .populate("sharedWith", "name");
+    .populate("sharedWith", "name")
+    .lean();
 
   if (!patient) throw new Error("Patient not found or not owned by you");
 
@@ -321,7 +314,7 @@ export const sharePatient = async (
   const updated = await Patient.findByIdAndUpdate(
     id,
     { $addToSet: { sharedWith: userId } },
-    { new: true },
+    UPDATE_OPTS,
   )
     .select(PATIENT_SELECT)
     .populate("owner", "name")
@@ -336,13 +329,13 @@ export const deleteSharedPatient = async (
   ownerId: string,
   userId: string,
 ) => {
-  const patient = await Patient.findOne({ _id: id, owner: ownerId });
+  const patient = await Patient.findOne({ _id: id, owner: ownerId }).lean();
   if (!patient) throw new Error("Patient not found or not owned by you");
 
   return await Patient.findByIdAndUpdate(
     id,
     { $pull: { sharedWith: userId } },
-    { new: true },
+    UPDATE_OPTS, // ← aunque sharedWith es ObjectId[], runValidators protege el cast
   )
     .select(PATIENT_SELECT)
     .populate("owner", "name")

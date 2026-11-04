@@ -1,5 +1,6 @@
 import Diagram from "../models/diagram.model.ts";
 import mongoose from "mongoose";
+import { UPDATE_OPTS } from "./utils.ts";
 
 import {
   clampLimit,
@@ -103,7 +104,7 @@ export const createDiagram = async (input: CreateDiagramInput) => {
 };
 
 export const updateDiagram = async (id: string, input: UpdateDiagramInput) => {
-  const diagram = await Diagram.findByIdAndUpdate(id, input, { new: true });
+  const diagram = await Diagram.findByIdAndUpdate(id, input, UPDATE_OPTS);
   return diagram?.populate("author", "name");
 };
 

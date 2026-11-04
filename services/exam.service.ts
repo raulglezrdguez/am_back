@@ -1,4 +1,5 @@
 import Exam from "../models/exam.model.ts";
+import { UPDATE_OPTS } from "./utils.ts";
 
 import type {
   CreateExamInput,
@@ -102,7 +103,11 @@ export const createExam = async (input: CreateExamInput) => {
 export const updateExamProperties = async (
   id: string,
   input: Partial<UpdateExamPropertiesInput>,
-) => await Exam.findByIdAndUpdate(id, input, { new: true });
+) => {
+  const exam = await Exam.findByIdAndUpdate(id, input, UPDATE_OPTS);
+  if (!exam) throw new Error("Exam not found");
+  return exam;
+};
 
 // Create exam expressions
 export const createExamExpression = async (
