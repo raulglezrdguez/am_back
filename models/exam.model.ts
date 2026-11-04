@@ -12,7 +12,7 @@ const AnswerOption = new Schema(
     value: { type: String, required: true },
     content: { type: String, required: true },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const expressionSchema = new Schema(
@@ -36,7 +36,7 @@ const expressionSchema = new Schema(
     reference: { type: String, required: false, default: "" },
     variable: { type: String, required: true },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const questionSchema = new Schema(
@@ -48,7 +48,7 @@ const questionSchema = new Schema(
     reference: { type: String, required: false },
     answers: { type: [AnswerOption], required: false },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const examSchema = new Schema(
@@ -65,9 +65,10 @@ const examSchema = new Schema(
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-examSchema.index({ author: 1 });
+examSchema.index({ author: 1, createdAt: -1 });
+examSchema.index({ public: 1, createdAt: -1 });
 
 export default mongoose.model("Exam", examSchema);

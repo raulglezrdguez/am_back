@@ -1,22 +1,71 @@
 import Diagram from "../models/diagram.model.ts";
 import mongoose from "mongoose";
 
+import {
+  clampLimit,
+  buildCursorFilter,
+  encodeCursor,
+  type CursorPage,
+} from "./utils.ts";
 import type {
   CreateDiagramInput,
   UpdateDiagramInput,
 } from "../types/diagram.d.ts";
 
-export const listDiagramsByAuthor = async (authorId: string) =>
-  await Diagram.find({ author: authorId }).populate("author", "name email");
+const DIAGRAM_LIST_PROJECTION =
+  "_id title description author public createdAt updatedAt"; // ← sin nodes/edges/result
 
-export const listPublicDiagrams = async () =>
-  await Diagram.find({ public: true }).populate("author", "name email");
+const toDiagramPage = (rows: any[], limit: number): CursorPage<any> => {
+  const hasMore = rows.length > limit;
+  const items = hasMore ? rows.slice(0, limit) : rows;
+  const nextCursor = hasMore
+    ? encodeCursor(
+        items[items.length - 1].createdAt,
+        String(items[items.length - 1]._id),
+      )
+    : null;
+  return { items, nextCursor, hasMore };
+};
+
+export const listDiagramsByAuthor = async (
+  authorId: string,
+  cursor?: string,
+  limitInput?: number,
+) => {
+  const limit = clampLimit(limitInput);
+  const rows = await Diagram.find({
+    author: authorId,
+    ...buildCursorFilter("createdAt", cursor),
+  })
+    .select(DIAGRAM_LIST_PROJECTION)
+    .populate("author", "name")
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(limit + 1)
+    .lean();
+  return toDiagramPage(rows, limit);
+};
+
+export const listPublicDiagrams = async (
+  cursor?: string,
+  limitInput?: number,
+) => {
+  const limit = clampLimit(limitInput);
+  const rows = await Diagram.find({
+    public: true,
+    ...buildCursorFilter("createdAt", cursor),
+  })
+    .select(DIAGRAM_LIST_PROJECTION)
+    .populate("author", "name")
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(limit + 1)
+    .lean();
+  return toDiagramPage(rows, limit);
+};
 
 export const getDiagramByAuthorId = async (id: string, authorId: string) => {
-  const diagram = await Diagram.findOne({ _id: id }).populate(
-    "author",
-    "name email"
-  );
+  const diagram = await Diagram.findOne({ _id: id })
+    .populate("author", "name")
+    .lean();
   if (diagram && diagram.author.id.toString() === authorId) {
     return diagram;
   }
@@ -24,18 +73,24 @@ export const getDiagramByAuthorId = async (id: string, authorId: string) => {
 };
 
 export const getPublicDiagramById = async (id: string) => {
-  return await Diagram.findOne({ _id: id, public: true }).populate(
-    "author",
-    "name email"
-  );
+  return await Diagram.findOne({ _id: id, public: true })
+    .populate("author", "name")
+    .lean();
 };
 
-export const getAllDiagrams = async () => {
-  return await Diagram.find().populate("author", "name email");
+export const getAllDiagrams = async (cursor?: string, limitInput?: number) => {
+  const limit = clampLimit(limitInput);
+  const rows = await Diagram.find({ ...buildCursorFilter("createdAt", cursor) })
+    .select(DIAGRAM_LIST_PROJECTION)
+    .populate("author", "name")
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(limit + 1)
+    .lean();
+  return toDiagramPage(rows, limit);
 };
 
 export const getDiagramById = async (id: string) => {
-  return await Diagram.findOne({ _id: id }).populate("author", "name email");
+  return await Diagram.findOne({ _id: id }).populate("author", "name").lean();
 };
 
 export const createDiagram = async (input: CreateDiagramInput) => {
@@ -44,20 +99,24 @@ export const createDiagram = async (input: CreateDiagramInput) => {
     author: new mongoose.Types.ObjectId(input.author),
   };
   const diagram = await Diagram.create(diagramInput);
-  return diagram.populate("author", "name email");
+  return diagram.populate("author", "name");
 };
 
 export const updateDiagram = async (id: string, input: UpdateDiagramInput) => {
   const diagram = await Diagram.findByIdAndUpdate(id, input, { new: true });
-  return diagram?.populate("author", "name email");
+  return diagram?.populate("author", "name");
 };
 
 export const deleteDiagram = async (id: string) => {
   const diagram = await Diagram.findByIdAndDelete(id);
-  return diagram?.populate("author", "name email");
+  return diagram?.populate("author", "name");
 };
 
-export const findDiagramsByNodeType = async (nodeType: string) => {
+export const findDiagramsByNodeType = async (
+  nodeType: string,
+  limitInput?: number,
+) => {
+  const limit = clampLimit(limitInput);
   return await Diagram.find({
     public: true,
     nodes: {
@@ -65,22 +124,36 @@ export const findDiagramsByNodeType = async (nodeType: string) => {
         type: nodeType,
       },
     },
-  }).populate("author", "name email");
+  })
+    .select(DIAGRAM_LIST_PROJECTION)
+    .populate("author", "name")
+    .limit(limit)
+    .lean();
 };
 
-export const findDiagramsByNodeLabel = async (nodeLabel: string) => {
+export const findDiagramsByNodeLabel = async (
+  nodeLabel: string,
+  limitInput?: number,
+) => {
+  const limit = clampLimit(limitInput);
   return await Diagram.find({
     public: true,
     nodes: {
       $elemMatch: { "data.label": nodeLabel },
     },
-  }).populate("author", "name email");
+  })
+    .select(DIAGRAM_LIST_PROJECTION)
+    .populate("author", "name")
+    .limit(limit)
+    .lean();
 };
 
 export const findDiagramsByNodeTypeAndLabel = async (
   nodeType: string,
-  nodeLabel: string
+  nodeLabel: string,
+  limitInput?: number,
 ) => {
+  const limit = clampLimit(limitInput);
   return await Diagram.find({
     public: true,
     nodes: {
@@ -89,5 +162,9 @@ export const findDiagramsByNodeTypeAndLabel = async (
         "data.label": nodeLabel,
       },
     },
-  }).populate("author", "name email");
+  })
+    .select(DIAGRAM_LIST_PROJECTION)
+    .populate("author", "name")
+    .limit(limit)
+    .lean();
 };

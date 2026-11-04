@@ -1,5 +1,11 @@
 import mongoose from "mongoose";
-import { escapeRegex } from "./utils.ts";
+import {
+  escapeRegex,
+  clampLimit,
+  buildCursorFilter,
+  encodeCursor,
+  type CursorPage,
+} from "./utils.ts";
 import Stat from "../models/stat.model.ts";
 import type {
   CreateStatInput,
@@ -20,41 +26,103 @@ const populateExamWithAuthor = {
   populate: { path: "author", select: "name" },
 };
 
-export const getStatById = async (id: string, actor: StatActor) =>
-  await Stat.findOne({ _id: id, ...buildAuthorScope(actor) })
-    .populate("exam")
-    .populate("author")
-    .populate("patient")
-    .lean();
+// Proyección mínima del examen: NO traer questions/expression
+const populateExamMinimal = {
+  path: "exam",
+  select: "title subtitle year", // ← sin questions/expression
+  populate: { path: "author", select: "name" },
+};
 
-export const getStatsByPatient = async (id: string, actor: StatActor) =>
-  Stat.find({ patient: id, ...buildAuthorScope(actor) })
-    .populate("exam")
-    .populate("author")
-    .populate("patient")
-    .lean();
-
-export const getStatsByExam = async (id: string, actor: StatActor) =>
-  Stat.find({ exam: id, ...buildAuthorScope(actor) })
-    .populate("exam")
-    .populate("author")
-    .populate("patient")
-    .lean();
+const STAT_PROJECTION =
+  "exam patient author completedAt result address createdAt";
 
 export type StatListOptions = {
   actor: StatActor;
   limit?: number;
-  skip?: number;
+  cursor?: string;
 };
 
+const buildBaseScope = (actor: StatActor) => buildAuthorScope(actor);
+
+function toCursorPage<T extends { _id: any; completedAt: Date }>(
+  rows: T[],
+  limit: number,
+  cursorOf: (row: T) => string,
+): CursorPage<T> {
+  const hasMore = rows.length > limit;
+  const items = hasMore ? rows.slice(0, limit) : rows;
+  const nextCursor = hasMore ? cursorOf(items[items.length - 1]) : null;
+  return { items, nextCursor, hasMore };
+}
+
+export const getStatById = async (id: string, actor: StatActor) =>
+  await Stat.findOne({ _id: id, ...buildAuthorScope(actor) })
+    .select(STAT_PROJECTION)
+    .populate(populateExamMinimal)
+    .populate("patient", "identifier name birthDate sex")
+    .populate("author", "name")
+    .lean();
+
+export const getStatsByPatient = async (
+  id: string,
+  actor: StatActor,
+  options: StatListOptions = { actor },
+): Promise<CursorPage<unknown>> => {
+  const limit = clampLimit(options.limit);
+  const filter = {
+    patient: id,
+    ...buildBaseScope(actor),
+    ...buildCursorFilter("completedAt", options.cursor),
+  };
+
+  const items = await Stat.find(filter)
+    .select(STAT_PROJECTION)
+    .populate(populateExamMinimal)
+    .populate("patient", "identifier name birthDate sex")
+    .populate("author", "name")
+    .sort({ completedAt: -1, _id: -1 })
+    .limit(limit + 1) // +1 para saber si hay siguiente
+    .lean();
+
+  return toCursorPage(items, limit, (s: any) =>
+    encodeCursor(s.completedAt, String(s._id)),
+  );
+};
+
+export const getStatsByExam = async (
+  id: string,
+  actor: StatActor,
+  options: StatListOptions = { actor },
+): Promise<CursorPage<unknown>> => {
+  const limit = clampLimit(options.limit);
+  const filter = {
+    exam: id,
+    ...buildBaseScope(actor),
+    ...buildCursorFilter("completedAt", options.cursor),
+  };
+
+  const items = await Stat.find(filter)
+    .select(STAT_PROJECTION)
+    .populate(populateExamMinimal)
+    .populate("patient", "identifier name")
+    .populate("author", "name")
+    .sort({ completedAt: -1, _id: -1 })
+    .limit(limit + 1)
+    .lean();
+
+  return toCursorPage(items, limit, (s: any) =>
+    encodeCursor(s.completedAt, String(s._id)),
+  );
+};
+
+// getStats (listado con filtros) con cursor
 export const getStats = async (
   filter: StatFilterInput,
   options: StatListOptions,
-) => {
-  const { actor, limit = 50, skip = 0 } = options;
-  const mongoFilter: Record<string, any> = {
-    ...buildAuthorScope(actor),
-  };
+): Promise<CursorPage<unknown>> => {
+  const { actor } = options;
+  const limit = clampLimit(options.limit);
+  const mongoFilter: Record<string, any> = { ...buildAuthorScope(actor) };
 
   if (filter.examId) mongoFilter.exam = filter.examId;
   if (filter.resultValue) mongoFilter["result.value"] = filter.resultValue;
@@ -68,12 +136,19 @@ export const getStats = async (
     mongoFilter.completedAt = { $lte: new Date(filter.completedAt) };
   }
 
-  return Stat.find(mongoFilter)
-    .populate(populateExamWithAuthor)
+  Object.assign(mongoFilter, buildCursorFilter("completedAt", options.cursor));
+
+  const items = await Stat.find(mongoFilter)
+    .select(STAT_PROJECTION)
+    .populate(populateExamMinimal)
     .populate("author", "name")
-    .skip(skip)
-    .limit(Math.min(limit, 100))
+    .sort({ completedAt: -1, _id: -1 })
+    .limit(limit + 1)
     .lean();
+
+  return toCursorPage(items, limit, (s: any) =>
+    encodeCursor(s.completedAt, String(s._id)),
+  );
 };
 
 export const createStat = async (input: CreateStatInput, actor: StatActor) => {

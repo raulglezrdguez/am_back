@@ -5,33 +5,95 @@ import type {
   CreatePatientInput,
   UpdatePatientInput,
 } from "../types/patient.d.ts";
-import { escapeRegex } from "./utils.ts";
+import {
+  escapeRegex,
+  clampLimit,
+  buildCursorFilter,
+  encodeCursor,
+  type CursorPage,
+} from "./utils.ts";
 
 const PATIENT_SELECT =
   "_id identifier name birthDate sex address phone email emergencyContact medicalHistory allergies medications owner sharedWith";
 
+const patientPage = (rows: any[], limit: number): CursorPage<any> => {
+  const hasMore = rows.length > limit;
+  const items = hasMore ? rows.slice(0, limit) : rows;
+  return {
+    items,
+    hasMore,
+    nextCursor: hasMore
+      ? encodeCursor(
+          items[items.length - 1].createdAt,
+          String(items[items.length - 1]._id),
+        )
+      : null,
+  };
+};
+
 // List only my patients
-export const listPatients = async (ownerId: string) =>
-  await Patient.find({ owner: ownerId })
-    .select(PATIENT_SELECT)
-    .populate("owner", "name email")
-    .populate("sharedWith", "name email");
-
-// List my shared patients
-export const listSharedPatients = async (userId: string) =>
-  await Patient.find({ sharedWith: userId })
-    .select(PATIENT_SELECT)
-    .populate("owner", "name email")
-    .populate("sharedWith", "name email");
-
-// list all patients
-export const listAllPatients = async (userId: string) =>
-  await Patient.find({
-    $or: [{ owner: userId }, { sharedWith: userId }],
+export const listPatients = async (
+  ownerId: string,
+  cursor?: string,
+  limitInput?: number,
+) => {
+  const limit = clampLimit(limitInput);
+  const rows = await Patient.find({
+    owner: ownerId,
+    ...buildCursorFilter("createdAt", cursor),
   })
     .select(PATIENT_SELECT)
-    .populate("owner", "name email")
-    .populate("sharedWith", "name email");
+    .populate("owner", "name")
+    .populate("sharedWith", "name")
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(limit + 1)
+    .lean();
+  return patientPage(rows, limit);
+};
+
+// List my shared patients
+export const listSharedPatients = async (
+  userId: string,
+  cursor?: string,
+  limitInput?: number,
+) => {
+  const limit = clampLimit(limitInput);
+  const rows = await Patient.find({
+    $and: [
+      { sharedWith: userId },
+      ...(cursor ? [buildCursorFilter("createdAt", cursor)] : []),
+    ],
+  })
+    .select(PATIENT_SELECT)
+    .populate("owner", "name")
+    .populate("sharedWith", "name")
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(limit + 1)
+    .lean();
+  return patientPage(rows, limit);
+};
+
+// list all patients
+export const listAllPatients = async (
+  userId: string,
+  cursor?: string,
+  limitInput?: number,
+) => {
+  const limit = clampLimit(limitInput);
+  const rows = await Patient.find({
+    $and: [
+      { $or: [{ owner: userId }, { sharedWith: userId }] },
+      ...(cursor ? [buildCursorFilter("createdAt", cursor)] : []),
+    ],
+  })
+    .select(PATIENT_SELECT)
+    .populate("owner", "name")
+    .populate("sharedWith", "name")
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(limit + 1)
+    .lean();
+  return patientPage(rows, limit);
+};
 
 // Get patient by ID only if it belongs to the owner
 export const getPatient = async (id: string, userId: string) =>
@@ -40,8 +102,9 @@ export const getPatient = async (id: string, userId: string) =>
     owner: userId,
   })
     .select(PATIENT_SELECT)
-    .populate("owner", "name email")
-    .populate("sharedWith", "name email");
+    .populate("owner", "name")
+    .populate("sharedWith", "name")
+    .lean();
 
 // Get patient by ID only if it is shared with the user
 export const getSharedPatient = async (id: string, userId: string) =>
@@ -50,8 +113,9 @@ export const getSharedPatient = async (id: string, userId: string) =>
     sharedWith: userId,
   })
     .select(PATIENT_SELECT)
-    .populate("owner", "name email")
-    .populate("sharedWith", "name email");
+    .populate("owner", "name")
+    .populate("sharedWith", "name")
+    .lean();
 
 // Get patient by ID only if it belongs to the owner or is shared with the user
 export const getAllPatient = async (id: string, userId: string) =>
@@ -60,8 +124,9 @@ export const getAllPatient = async (id: string, userId: string) =>
     $or: [{ owner: userId }, { sharedWith: userId }],
   })
     .select(PATIENT_SELECT)
-    .populate("owner", "name email")
-    .populate("sharedWith", "name email");
+    .populate("owner", "name")
+    .populate("sharedWith", "name")
+    .lean();
 
 // get patient by identifier or name
 export const getPatientBy = async (
@@ -92,8 +157,8 @@ export const getPatientBy = async (
 
   return await Patient.find(filter)
     .select(PATIENT_SELECT)
-    .populate("owner", "name email")
-    .populate("sharedWith", "name email")
+    .populate("owner", "name")
+    .populate("sharedWith", "name")
     .lean();
 };
 
@@ -126,8 +191,8 @@ export const getSharedPatientBy = async (
 
   return await Patient.find(filter)
     .select(PATIENT_SELECT)
-    .populate("owner", "name email")
-    .populate("sharedWith", "name email")
+    .populate("owner", "name")
+    .populate("sharedWith", "name")
     .lean();
 };
 
@@ -160,8 +225,8 @@ export const getAllPatientBy = async (
 
   return await Patient.find(filter)
     .select(PATIENT_SELECT)
-    .populate("owner", "name email")
-    .populate("sharedWith", "name email")
+    .populate("owner", "name")
+    .populate("sharedWith", "name")
     .lean();
 };
 
@@ -173,8 +238,8 @@ export const createPatient = async (
 
   return await Patient.findById(patient._id)
     .select(PATIENT_SELECT)
-    .populate("owner", "name email")
-    .populate("sharedWith", "name email");
+    .populate("owner", "name")
+    .populate("sharedWith", "name");
 };
 
 // Update patient
@@ -217,8 +282,8 @@ export const updatePatient = async (
     { new: true, runValidators: true },
   )
     .select(PATIENT_SELECT)
-    .populate("owner", "name email")
-    .populate("sharedWith", "name email");
+    .populate("owner", "name")
+    .populate("sharedWith", "name");
 
   if (!patient) throw new Error("Patient not found or not owned by you");
   return patient;
@@ -228,8 +293,8 @@ export const updatePatient = async (
 export const deletePatient = async (id: string, ownerId: string) => {
   const patient = await Patient.findOne({ _id: id, owner: ownerId })
     .select(PATIENT_SELECT)
-    .populate("owner", "name email")
-    .populate("sharedWith", "name email");
+    .populate("owner", "name")
+    .populate("sharedWith", "name");
 
   if (!patient) throw new Error("Patient not found or not owned by you");
 
@@ -259,8 +324,8 @@ export const sharePatient = async (
     { new: true },
   )
     .select(PATIENT_SELECT)
-    .populate("owner", "name email")
-    .populate("sharedWith", "name email");
+    .populate("owner", "name")
+    .populate("sharedWith", "name");
 
   return updated;
 };
@@ -280,6 +345,6 @@ export const deleteSharedPatient = async (
     { new: true },
   )
     .select(PATIENT_SELECT)
-    .populate("owner", "name email")
-    .populate("sharedWith", "name email");
+    .populate("owner", "name")
+    .populate("sharedWith", "name");
 };

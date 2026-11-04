@@ -9,7 +9,7 @@ const Result = new Schema(
     value: { type: String, required: true },
     reference: { type: String, required: false },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const DiagramSchema = new Schema(
@@ -54,11 +54,16 @@ const DiagramSchema = new Schema(
       zoom: { type: Number, default: 1 },
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-DiagramSchema.index({ author: 1 });
+DiagramSchema.index({ author: 1, createdAt: -1 });
+DiagramSchema.index({ public: 1, createdAt: -1 });
 
+// Mantener los de nodos SOLO si las búsquedas por nodo son un caso de uso real.
+// Los índices multikey sobre arrays anidados penalizan escrituras: cada nodo nuevo
+// actualiza el índice. Si findDiagramsByNode* es ocasional, considera eliminarlos
+// o moverlos a una colección/materialización aparte.
 DiagramSchema.index({ "nodes.type": 1 });
 /** ejemplo de uso:
  * const diagrams = await Diagram.find({

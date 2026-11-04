@@ -1,14 +1,50 @@
 import Exam from "../models/exam.model.ts";
+
 import type {
   CreateExamInput,
   ExpressionInput,
   QuestionInput,
   UpdateExamPropertiesInput,
 } from "../types/exam.d.ts";
+import {
+  clampLimit,
+  buildCursorFilter,
+  encodeCursor,
+  type CursorPage,
+} from "./utils.ts";
+
+const EXAM_LIST_PROJECTION =
+  "_id title subtitle instructions description author year public createdAt";
 
 // List only public exams
-export const listExams = async () =>
-  await Exam.find({ public: true }).populate("author", "name email");
+export const listExams = async (
+  cursor?: string,
+  limitInput?: number,
+): Promise<CursorPage<any>> => {
+  const limit = clampLimit(limitInput);
+  const rows = await Exam.find({
+    public: true,
+    ...buildCursorFilter("createdAt", cursor),
+  })
+    .select(EXAM_LIST_PROJECTION) // ← sin questions/expression
+    .populate("author", "name")
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(limit + 1)
+    .lean();
+
+  const hasMore = rows.length > limit;
+  const items = hasMore ? rows.slice(0, limit) : rows;
+  return {
+    items,
+    hasMore,
+    nextCursor: hasMore
+      ? encodeCursor(
+          items[items.length - 1].createdAt,
+          String(items[items.length - 1]._id),
+        )
+      : null,
+  };
+};
 
 // Get exam by ID only if it's public or belongs to the author
 export const getExamById = async (id: string, userId: string | null) => {
@@ -16,17 +52,45 @@ export const getExamById = async (id: string, userId: string | null) => {
     return await Exam.findOne({
       _id: id,
       $or: [{ public: true }, { author: userId }],
-    }).populate("author", "name email");
+    })
+      .populate("author", "name")
+      .lean();
 
-  return await Exam.findOne({ _id: id, public: true }).populate(
-    "author",
-    "name email"
-  );
+  return await Exam.findOne({ _id: id, public: true })
+    .populate("author", "name")
+    .lean();
 };
 
 // List exams by author
-export const listExamsByAuthor = async (authorId: string) =>
-  await Exam.find({ author: authorId }).populate("author", "name email");
+export const listExamsByAuthor = async (
+  authorId: string,
+  cursor?: string,
+  limitInput?: number,
+): Promise<CursorPage<any>> => {
+  const limit = clampLimit(limitInput);
+  const rows = await Exam.find({
+    author: authorId,
+    ...buildCursorFilter("createdAt", cursor),
+  })
+    .select(EXAM_LIST_PROJECTION)
+    .populate("author", "name")
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(limit + 1)
+    .lean();
+
+  const hasMore = rows.length > limit;
+  const items = hasMore ? rows.slice(0, limit) : rows;
+  return {
+    items,
+    hasMore,
+    nextCursor: hasMore
+      ? encodeCursor(
+          items[items.length - 1].createdAt,
+          String(items[items.length - 1]._id),
+        )
+      : null,
+  };
+};
 
 // Create a new exam
 export const createExam = async (input: CreateExamInput) => {
@@ -37,13 +101,13 @@ export const createExam = async (input: CreateExamInput) => {
 // Update exam properties
 export const updateExamProperties = async (
   id: string,
-  input: Partial<UpdateExamPropertiesInput>
+  input: Partial<UpdateExamPropertiesInput>,
 ) => await Exam.findByIdAndUpdate(id, input, { new: true });
 
 // Create exam expressions
 export const createExamExpression = async (
   id: string,
-  input: ExpressionInput[]
+  input: ExpressionInput[],
 ) => {
   const exam = await Exam.findById(id);
   if (!exam) throw new Error("Exam not found");
@@ -56,7 +120,7 @@ export const createExamExpression = async (
 // update exam expression
 export const updateExamExpression = async (
   id: string,
-  input: ExpressionInput
+  input: ExpressionInput,
 ) => {
   const exam = await Exam.findById(id);
   if (!exam) throw new Error("Exam not found");
@@ -76,7 +140,7 @@ export const updateExamExpression = async (
 // delete exam expression
 export const deleteExamExpression = async (
   id: string,
-  expressionId: string
+  expressionId: string,
 ) => {
   const exam = await Exam.findById(id);
   if (!exam) throw new Error("Exam not found");
@@ -93,7 +157,7 @@ export const deleteExamExpression = async (
 // Create exam questions
 export const createExamQuestions = async (
   id: string,
-  input: QuestionInput[]
+  input: QuestionInput[],
 ) => {
   const exam = await Exam.findById(id);
   if (!exam) throw new Error("Exam not found");
@@ -131,7 +195,7 @@ export const updateExamQuestion = async (id: string, input: QuestionInput) => {
 export const updateExamQuestionId = async (
   id: string,
   questionId: string,
-  input: QuestionInput
+  input: QuestionInput,
 ) => {
   const exam = await Exam.findById(id);
   if (!exam) throw new Error("Exam not found");

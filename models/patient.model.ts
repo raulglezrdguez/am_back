@@ -49,9 +49,11 @@ const patientSchema = new Schema(
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-patientSchema.index({ author: 1 });
+patientSchema.index({ owner: 1, name: 1 }); // listados por dueño + búsqueda
+patientSchema.index({ sharedWith: 1 }); // listados compartidos
+patientSchema.index({ owner: 1, identifier: 1 }); // búsqueda por identificador
 
 export default mongoose.model("Patient", patientSchema);

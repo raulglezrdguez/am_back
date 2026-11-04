@@ -25,9 +25,9 @@ const statSchema = new Schema(
   { timestamps: true },
 );
 
-statSchema.index({ author: 1 });
-statSchema.index({ exam: 1 });
-statSchema.index({ patient: 1 });
-statSchema.index({ completedAt: -1 });
+statSchema.index({ author: 1, completedAt: -1 }); // listados por autor
+statSchema.index({ exam: 1, completedAt: -1 }); // stats por examen
+statSchema.index({ patient: 1, completedAt: -1 }); // stats por paciente
+statSchema.index({ completedAt: -1 }); // listado global admin
 
 export default mongoose.model("Stat", statSchema);

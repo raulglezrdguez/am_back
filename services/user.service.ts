@@ -12,9 +12,9 @@ export const createUser = async (input: CreateUserInput) => {
   return await User.create(input);
 };
 export const findByEmail = async (email: string) =>
-  await User.findOne({ email });
-export const listUsers = async () => await User.find({});
-export const getUserById = async (id: string) => await User.findById(id);
+  await User.findOne({ email }).lean();
+export const listUsers = async () => await User.find({}).lean();
+export const getUserById = async (id: string) => await User.findById(id).lean();
 export const updateUser = async (id: string, input: Partial<CreateUserInput>) =>
   await User.findByIdAndUpdate(id, input, { new: true });
 export const deleteUser = async (id: string) =>
