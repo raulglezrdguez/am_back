@@ -1,5 +1,8 @@
+import mongoose from "mongoose";
+
 import Patient from "../models/patient.model.ts";
 import User from "../models/user.model.ts";
+import Stat from "../models/stat.model.ts";
 import { UPDATE_OPTS, UPDATE_OPTS_WITH_SETTERS } from "./utils.ts";
 
 import type {
@@ -20,6 +23,7 @@ const PATIENT_POPULATES = [
   { path: "owner", select: "name email role status createdAt updatedAt" },
   { path: "sharedWith", select: "name email role status createdAt updatedAt" },
 ];
+const NOT_DELETED = { deletedAt: null };
 
 const patientPage = (rows: any[], limit: number): CursorPage<any> => {
   const hasMore = rows.length > limit;
@@ -44,6 +48,7 @@ export const listPatients = async (
 ) => {
   const limit = clampLimit(limitInput);
   const rows = await Patient.find({
+    ...NOT_DELETED,
     owner: ownerId,
     ...buildCursorFilter("createdAt", cursor),
   })
@@ -64,6 +69,7 @@ export const listSharedPatients = async (
 ) => {
   const limit = clampLimit(limitInput);
   const rows = await Patient.find({
+    ...NOT_DELETED,
     $and: [
       { sharedWith: userId },
       ...(cursor ? [buildCursorFilter("createdAt", cursor)] : []),
@@ -86,6 +92,7 @@ export const listAllPatients = async (
 ) => {
   const limit = clampLimit(limitInput);
   const rows = await Patient.find({
+    ...NOT_DELETED,
     $and: [
       { $or: [{ owner: userId }, { sharedWith: userId }] },
       ...(cursor ? [buildCursorFilter("createdAt", cursor)] : []),
@@ -102,10 +109,7 @@ export const listAllPatients = async (
 
 // Get patient by ID only if it belongs to the owner
 export const getPatient = async (id: string, userId: string) =>
-  await Patient.findOne({
-    _id: id,
-    owner: userId,
-  })
+  await Patient.findOne({ ...NOT_DELETED, _id: id, owner: userId })
     .select(PATIENT_SELECT)
     .populate("owner", "name")
     .populate("sharedWith", "name")
@@ -113,10 +117,7 @@ export const getPatient = async (id: string, userId: string) =>
 
 // Get patient by ID only if it is shared with the user
 export const getSharedPatient = async (id: string, userId: string) =>
-  await Patient.findOne({
-    _id: id,
-    sharedWith: userId,
-  })
+  await Patient.findOne({ ...NOT_DELETED, _id: id, sharedWith: userId })
     .select(PATIENT_SELECT)
     .populate("owner", "name")
     .populate("sharedWith", "name")
@@ -125,6 +126,7 @@ export const getSharedPatient = async (id: string, userId: string) =>
 // Get patient by ID only if it belongs to the owner or is shared with the user
 export const getAllPatient = async (id: string, userId: string) =>
   await Patient.findOne({
+    ...NOT_DELETED,
     _id: id,
     $or: [{ owner: userId }, { sharedWith: userId }],
   })
@@ -154,6 +156,7 @@ export const getPatientBy = async (
   }
 
   const filter: Record<string, unknown> = {
+    ...NOT_DELETED,
     $and: [
       { owner: userId },
       ...(conditions.length > 0 ? [{ $or: conditions }] : []),
@@ -188,6 +191,7 @@ export const getSharedPatientBy = async (
   }
 
   const filter: Record<string, unknown> = {
+    ...NOT_DELETED,
     $and: [
       { sharedWith: userId },
       ...(conditions.length > 0 ? [{ $or: conditions }] : []),
@@ -222,6 +226,7 @@ export const getAllPatientBy = async (
   }
 
   const filter: Record<string, unknown> = {
+    ...NOT_DELETED,
     $and: [
       { $or: [{ owner: userId }, { sharedWith: userId }] },
       ...(conditions.length > 0 ? [{ $or: conditions }] : []),
@@ -274,9 +279,9 @@ export const updatePatient = async (
   }
 
   const patient = await Patient.findOneAndUpdate(
-    { _id: id, owner: ownerId },
+    { ...NOT_DELETED, _id: id, owner: ownerId },
     sanitized,
-    UPDATE_OPTS_WITH_SETTERS, // ← runValidators + runSettersOnQuery
+    UPDATE_OPTS_WITH_SETTERS,
   )
     .select(PATIENT_SELECT)
     .populate(PATIENT_POPULATES[0])
@@ -289,7 +294,11 @@ export const updatePatient = async (
 
 // Delete a patient
 export const deletePatient = async (id: string, ownerId: string) => {
-  const patient = await Patient.findOne({ _id: id, owner: ownerId })
+  const patient = await Patient.findOne({
+    ...NOT_DELETED,
+    _id: id,
+    owner: ownerId,
+  })
     .select(PATIENT_SELECT)
     .populate("owner", "name")
     .populate("sharedWith", "name")
@@ -297,8 +306,33 @@ export const deletePatient = async (id: string, ownerId: string) => {
 
   if (!patient) throw new Error("Patient not found or not owned by you");
 
-  await Patient.deleteOne({ _id: id });
-  return patient;
+  const session = await mongoose.startSession();
+  try {
+    let deleted;
+    await session.withTransaction(async () => {
+      const statsCount = await Stat.countDocuments({ patient: id }).session(
+        session,
+      );
+      if (statsCount > 0)
+        throw new Error(
+          `Cannot delete patient: ${statsCount} statistics reference it.`,
+        );
+
+      const patient = await Patient.findOneAndDelete({
+        _id: id,
+        owner: ownerId,
+      })
+        .session(session)
+        .populate("owner", "name")
+        .populate("sharedWith", "name")
+        .lean();
+      if (!patient) throw new Error("Patient not found or not owned by you");
+      deleted = patient;
+    });
+    return deleted;
+  } finally {
+    await session.endSession();
+  }
 };
 
 // Share a patient with another user (only owner can share)
@@ -307,7 +341,11 @@ export const sharePatient = async (
   ownerId: string,
   userId: string,
 ) => {
-  const patient = await Patient.findOne({ _id: id, owner: ownerId });
+  const patient = await Patient.findOne({
+    ...NOT_DELETED,
+    _id: id,
+    owner: ownerId,
+  });
   if (!patient) throw new Error("Patient not found or not owned by you");
 
   if (patient.owner.toString() === userId) {
@@ -335,7 +373,11 @@ export const deleteSharedPatient = async (
   ownerId: string,
   userId: string,
 ) => {
-  const patient = await Patient.findOne({ _id: id, owner: ownerId }).lean();
+  const patient = await Patient.findOne({
+    ...NOT_DELETED,
+    _id: id,
+    owner: ownerId,
+  }).lean();
   if (!patient) throw new Error("Patient not found or not owned by you");
 
   return await Patient.findByIdAndUpdate(

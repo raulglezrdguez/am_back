@@ -86,6 +86,7 @@ const patientSchema = new Schema(
     sharedWith: { type: ObjectId, ref: "User", required: false },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
+    deletedAt: { type: Date, default: null, index: true },
   },
   { timestamps: true },
 );

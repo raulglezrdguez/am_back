@@ -64,6 +64,7 @@ const examSchema = new Schema(
     questions: { type: [questionSchema], required: true, default: [] },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
+    deletedAt: { type: Date, default: null, index: true },
   },
   { timestamps: true },
 );

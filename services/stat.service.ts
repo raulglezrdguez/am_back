@@ -7,6 +7,8 @@ import {
   type CursorPage,
 } from "./utils.ts";
 import Stat from "../models/stat.model.ts";
+import Patient from "../models/patient.model.ts";
+import Exam from "../models/exam.model.ts";
 import type {
   CreateStatInput,
   StatAnswer,
@@ -19,12 +21,6 @@ import {
   buildAuthorScope,
   type StatActor,
 } from "./stat.policy.ts";
-
-const populateExamWithAuthor = {
-  path: "exam",
-  select: "title subtitle year",
-  populate: { path: "author", select: "name" },
-};
 
 // Proyección mínima del examen: NO traer questions/expression
 const populateExamMinimal = {
@@ -177,31 +173,68 @@ export const createStat = async (input: CreateStatInput, actor: StatActor) => {
     throw new NotFoundError("Stat not found");
   }
 
-  const stat = await Stat.create({
-    exam: input.examId,
-    patient: input.patientId,
-    author: input.authorId,
-    completedAt: input.completedAt,
-    result: {
-      value: input.result.value,
-      text: input.result.text,
-    } as StatResult,
-    answers: input.answers.map(
-      (ans: StatAnswer) => ({ id: ans.id, answer: ans.answer }) as StatAnswer,
-    ),
-    address: input.address,
-  });
+  const session = await mongoose.startSession();
+  try {
+    let created;
+    await session.withTransaction(async () => {
+      // Validaciones dentro de la transacción (lectura consistente)
+      // El paciente debe pertenecer al actor (o ser compartido con él)
+      // Admin: puede usar cualquiera.
+      const patientFilter =
+        actor.role === 0
+          ? { _id: input.patientId }
+          : {
+              _id: input.patientId,
+              $or: [{ owner: actor.id }, { sharedWith: actor.id }],
+            };
+      const patient = await Patient.findOne(patientFilter)
+        .session(session)
+        .lean();
+      if (!patient) throw new NotFoundError("Patient not found");
 
-  // Devolvemos el doc recién creado con scope (por si el author cambió en carrera).
-  const created = await Stat.findOne({
-    _id: stat._id,
-    ...buildAuthorScope(actor),
-  })
-    .populate(populateExamFull)
-    .populate(populatePatientMin)
-    .populate(populateAuthorFull)
-    .lean();
+      // El examen debe existir y ser accesible (público o del actor)
+      const examFilter =
+        actor.role === 0
+          ? { _id: input.examId }
+          : {
+              _id: input.examId,
+              $or: [{ public: true }, { author: actor.id }],
+            };
+      const exam = await Exam.findOne(examFilter).session(session).lean();
+      if (!exam) throw new NotFoundError("Exam not found");
 
-  if (!created) throw new NotFoundError("Stat not found");
-  return created;
+      const [doc] = await Stat.create(
+        [
+          {
+            exam: input.examId,
+            patient: input.patientId,
+            author: input.authorId,
+            completedAt: input.completedAt,
+            result: {
+              value: input.result.value,
+              text: input.result.text,
+            } as StatResult,
+            answers: input.answers.map(
+              (ans: StatAnswer) =>
+                ({ id: ans.id, answer: ans.answer }) as StatAnswer,
+            ),
+            address: input.address,
+          },
+        ],
+        { session },
+      );
+
+      // Releer populado dentro de la transacción
+      created = await Stat.findOne({ _id: doc._id, ...buildAuthorScope(actor) })
+        .session(session)
+        .populate(populateExamFull)
+        .populate(populatePatientMin)
+        .populate(populateAuthorFull)
+        .lean();
+    });
+    if (!created) throw new NotFoundError("Stat not found");
+    return created;
+  } finally {
+    await session.endSession();
+  }
 };

@@ -1,4 +1,5 @@
 import Exam from "../models/exam.model.ts";
+import Stat from "../models/stat.model.ts";
 import { UPDATE_OPTS } from "./utils.ts";
 
 import type {
@@ -20,6 +21,7 @@ const EXAM_LIST_PROJECTION =
 const EXAM_POPULATES = [
   { path: "author", select: "name email role status createdAt updatedAt" },
 ];
+const NOT_DELETED = { deletedAt: null };
 
 // List only public exams
 export const listExams = async (
@@ -28,6 +30,7 @@ export const listExams = async (
 ): Promise<CursorPage<any>> => {
   const limit = clampLimit(limitInput);
   const rows = await Exam.find({
+    ...NOT_DELETED,
     public: true,
     ...buildCursorFilter("createdAt", cursor),
   })
@@ -54,8 +57,8 @@ export const listExams = async (
 // Get exam by ID only if it's public or belongs to the author
 export const getExamById = async (id: string, userId: string | null) => {
   const filter = userId
-    ? { _id: id, $or: [{ public: true }, { author: userId }] }
-    : { _id: id, public: true };
+    ? { ...NOT_DELETED, _id: id, $or: [{ public: true }, { author: userId }] }
+    : { ...NOT_DELETED, _id: id, public: true };
   const exam = await Exam.findOne(filter).populate(EXAM_POPULATES[0]);
   return exam ? exam.toObject({ virtuals: true }) : null;
 };
@@ -68,6 +71,7 @@ export const listExamsByAuthor = async (
 ): Promise<CursorPage<any>> => {
   const limit = clampLimit(limitInput);
   const rows = await Exam.find({
+    ...NOT_DELETED,
     author: authorId,
     ...buildCursorFilter("createdAt", cursor),
   })
@@ -105,7 +109,7 @@ export const updateExamProperties = async (
   const exam = await Exam.findByIdAndUpdate(id, input, UPDATE_OPTS).populate(
     EXAM_POPULATES[0],
   );
-  if (!exam) throw new Error("Exam not found");
+  if (!exam || exam.deletedAt) throw new Error("Exam not found");
   return exam.toObject({ virtuals: true });
 };
 
@@ -115,7 +119,7 @@ export const createExamExpression = async (
   input: ExpressionInput[],
 ) => {
   const exam = await Exam.findById(id);
-  if (!exam) throw new Error("Exam not found");
+  if (!exam || exam.deletedAt) throw new Error("Exam not found");
 
   exam.expression?.push(...input);
 
@@ -130,7 +134,7 @@ export const updateExamExpression = async (
   input: ExpressionInput,
 ) => {
   const exam = await Exam.findById(id);
-  if (!exam) throw new Error("Exam not found");
+  if (!exam || exam.deletedAt) throw new Error("Exam not found");
 
   const expression = exam.expression?.find((expr) => expr.id === input.id);
   if (!expression) throw new Error("Expression not found in exam");
@@ -152,7 +156,7 @@ export const deleteExamExpression = async (
   expressionId: string,
 ) => {
   const exam = await Exam.findById(id);
-  if (!exam) throw new Error("Exam not found");
+  if (!exam || exam.deletedAt) throw new Error("Exam not found");
 
   const index = exam.expression?.findIndex((expr) => expr.id === expressionId);
   if (index === -1 || index === undefined)
@@ -171,7 +175,7 @@ export const createExamQuestions = async (
   input: QuestionInput[],
 ) => {
   const exam = await Exam.findById(id);
-  if (!exam) throw new Error("Exam not found");
+  if (!exam || exam.deletedAt) throw new Error("Exam not found");
 
   exam.questions?.push(...input);
 
@@ -183,7 +187,7 @@ export const createExamQuestions = async (
 // update exam question
 export const updateExamQuestion = async (id: string, input: QuestionInput) => {
   const exam = await Exam.findById(id);
-  if (!exam) throw new Error("Exam not found");
+  if (!exam || exam.deletedAt) throw new Error("Exam not found");
 
   const question = exam.questions?.find((quest) => quest.id === input.id);
   if (!question) throw new Error("Question not found in exam");
@@ -213,7 +217,7 @@ export const updateExamQuestionId = async (
   input: QuestionInput,
 ) => {
   const exam = await Exam.findById(id);
-  if (!exam) throw new Error("Exam not found");
+  if (!exam || exam.deletedAt) throw new Error("Exam not found");
 
   const question = exam.questions?.find((quest) => quest.id === questionId);
   if (!question) throw new Error("Question not found in exam");
@@ -241,7 +245,7 @@ export const updateExamQuestionId = async (
 // delete exam question
 export const deleteExamQuestion = async (id: string, questionId: string) => {
   const exam = await Exam.findById(id);
-  if (!exam) throw new Error("Exam not found");
+  if (!exam || exam.deletedAt) throw new Error("Exam not found");
 
   const index = exam.questions?.findIndex((quest) => quest.id === questionId);
   if (index === -1 || index === undefined)
@@ -256,6 +260,13 @@ export const deleteExamQuestion = async (id: string, questionId: string) => {
 
 // Delete an exam
 export const deleteExam = async (id: string) => {
+  const statsCount = await Stat.countDocuments({ exam: id });
+  if (statsCount > 0) {
+    throw new Error(
+      `Cannot delete exam: ${statsCount} statistics reference it.`,
+    );
+  }
+
   const exam = await Exam.findByIdAndDelete(id).populate(EXAM_POPULATES[0]);
   if (!exam) throw new Error("Exam not found");
 
