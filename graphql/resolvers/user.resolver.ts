@@ -23,7 +23,7 @@ export default {
     updateUser: (
       _: any,
       { id, input }: { id: string; input: UpdateUserInput },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
@@ -33,7 +33,7 @@ export default {
     updateUserRole: (
       _: any,
       { id, role }: { id: string; role: number },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
@@ -43,7 +43,7 @@ export default {
     updateUserStatus: (
       _: any,
       { id, status }: { id: string; status: number },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
@@ -54,7 +54,7 @@ export default {
     deleteUser: (
       _: any,
       { id }: { id: string },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 

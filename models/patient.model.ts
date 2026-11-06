@@ -83,6 +83,7 @@ const patientSchema = new Schema(
     medications: { type: [String], required: false, default: [] },
     public: { type: Boolean, required: true, default: false },
     owner: { type: ObjectId, ref: "User", required: true },
+    sharedWith: { type: ObjectId, ref: "User", required: false },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
   },

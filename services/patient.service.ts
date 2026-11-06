@@ -16,6 +16,10 @@ import {
 
 const PATIENT_SELECT =
   "_id identifier name birthDate sex address phone email emergencyContact medicalHistory allergies medications owner sharedWith";
+const PATIENT_POPULATES = [
+  { path: "owner", select: "name email role status createdAt updatedAt" },
+  { path: "sharedWith", select: "name email role status createdAt updatedAt" },
+];
 
 const patientPage = (rows: any[], limit: number): CursorPage<any> => {
   const hasMore = rows.length > limit;
@@ -240,7 +244,8 @@ export const createPatient = async (
   return await Patient.findById(patient._id)
     .select(PATIENT_SELECT)
     .populate("owner", "name")
-    .populate("sharedWith", "name");
+    .populate("sharedWith", "name")
+    .lean();
 };
 
 // Update patient
@@ -274,8 +279,9 @@ export const updatePatient = async (
     UPDATE_OPTS_WITH_SETTERS, // ← runValidators + runSettersOnQuery
   )
     .select(PATIENT_SELECT)
-    .populate("owner", "name")
-    .populate("sharedWith", "name");
+    .populate(PATIENT_POPULATES[0])
+    .populate(PATIENT_POPULATES[1])
+    .lean();
 
   if (!patient) throw new Error("Patient not found or not owned by you");
   return patient;

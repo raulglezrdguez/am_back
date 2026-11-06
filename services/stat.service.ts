@@ -32,6 +32,23 @@ const populateExamMinimal = {
   select: "title subtitle year", // ← sin questions/expression
   populate: { path: "author", select: "name" },
 };
+const populateExamFull = {
+  path: "exam",
+  select: "title subtitle year author",
+  populate: {
+    path: "author",
+    select: "name email role status createdAt updatedAt",
+  },
+};
+
+const populatePatientMin = {
+  path: "patient",
+  select: "identifier name birthDate sex",
+};
+const populateAuthorFull = {
+  path: "author",
+  select: "name email role status createdAt updatedAt",
+};
 
 const STAT_PROJECTION =
   "exam patient author completedAt result address createdAt";
@@ -55,13 +72,15 @@ function toCursorPage<T extends { _id: any; completedAt: Date }>(
   return { items, nextCursor, hasMore };
 }
 
-export const getStatById = async (id: string, actor: StatActor) =>
-  await Stat.findOne({ _id: id, ...buildAuthorScope(actor) })
+export const getStatById = async (id: string, actor: StatActor) => {
+  const stat = await Stat.findOne({ _id: id, ...buildAuthorScope(actor) })
     .select(STAT_PROJECTION)
-    .populate(populateExamMinimal)
-    .populate("patient", "identifier name birthDate sex")
-    .populate("author", "name")
+    .populate(populateExamFull)
+    .populate(populatePatientMin)
+    .populate(populateAuthorFull)
     .lean();
+  return stat;
+};
 
 export const getStatsByPatient = async (
   id: string,
@@ -178,9 +197,9 @@ export const createStat = async (input: CreateStatInput, actor: StatActor) => {
     _id: stat._id,
     ...buildAuthorScope(actor),
   })
-    .populate("exam")
-    .populate("patient")
-    .populate("author")
+    .populate(populateExamFull)
+    .populate(populatePatientMin)
+    .populate(populateAuthorFull)
     .lean();
 
   if (!created) throw new NotFoundError("Stat not found");

@@ -13,9 +13,13 @@ import {
   encodeCursor,
   type CursorPage,
 } from "./utils.ts";
+import { loadPopulated } from "./load.ts";
 
 const EXAM_LIST_PROJECTION =
   "_id title subtitle instructions description author year public createdAt";
+const EXAM_POPULATES = [
+  { path: "author", select: "name email role status createdAt updatedAt" },
+];
 
 // List only public exams
 export const listExams = async (
@@ -49,17 +53,11 @@ export const listExams = async (
 
 // Get exam by ID only if it's public or belongs to the author
 export const getExamById = async (id: string, userId: string | null) => {
-  if (userId)
-    return await Exam.findOne({
-      _id: id,
-      $or: [{ public: true }, { author: userId }],
-    })
-      .populate("author", "name")
-      .lean();
-
-  return await Exam.findOne({ _id: id, public: true })
-    .populate("author", "name")
-    .lean();
+  const filter = userId
+    ? { _id: id, $or: [{ public: true }, { author: userId }] }
+    : { _id: id, public: true };
+  const exam = await Exam.findOne(filter).populate(EXAM_POPULATES[0]);
+  return exam ? exam.toObject({ virtuals: true }) : null;
 };
 
 // List exams by author
@@ -96,7 +94,7 @@ export const listExamsByAuthor = async (
 // Create a new exam
 export const createExam = async (input: CreateExamInput) => {
   const exam = await Exam.create(input);
-  return getExamById(exam._id.toString(), exam.author.toString());
+  return loadPopulated(Exam, exam._id.toString(), EXAM_POPULATES);
 };
 
 // Update exam properties
@@ -104,9 +102,11 @@ export const updateExamProperties = async (
   id: string,
   input: Partial<UpdateExamPropertiesInput>,
 ) => {
-  const exam = await Exam.findByIdAndUpdate(id, input, UPDATE_OPTS);
+  const exam = await Exam.findByIdAndUpdate(id, input, UPDATE_OPTS).populate(
+    EXAM_POPULATES[0],
+  );
   if (!exam) throw new Error("Exam not found");
-  return exam;
+  return exam.toObject({ virtuals: true });
 };
 
 // Create exam expressions
@@ -119,7 +119,9 @@ export const createExamExpression = async (
 
   exam.expression?.push(...input);
 
-  return await exam.save();
+  const doc = await exam.save();
+  await doc.populate(EXAM_POPULATES[0]);
+  return doc.toObject({ virtuals: true });
 };
 
 // update exam expression
@@ -139,7 +141,9 @@ export const updateExamExpression = async (
   expression.reference = input.reference || "";
   expression.variable = input.variable;
 
-  return await exam.save();
+  const doc = await exam.save();
+  await doc.populate(EXAM_POPULATES[0]);
+  return doc.toObject({ virtuals: true });
 };
 
 // delete exam expression
@@ -156,7 +160,9 @@ export const deleteExamExpression = async (
 
   exam.expression?.splice(index, 1);
 
-  return await exam.save();
+  const doc = await exam.save();
+  await doc.populate(EXAM_POPULATES[0]);
+  return doc.toObject({ virtuals: true });
 };
 
 // Create exam questions
@@ -169,7 +175,9 @@ export const createExamQuestions = async (
 
   exam.questions?.push(...input);
 
-  return await exam.save();
+  const doc = await exam.save();
+  await doc.populate(EXAM_POPULATES[0]);
+  return doc.toObject({ virtuals: true });
 };
 
 // update exam question
@@ -195,7 +203,9 @@ export const updateExamQuestion = async (id: string, input: QuestionInput) => {
     question.answers?.push(...input.answers);
   }
 
-  return await exam.save();
+  const doc = await exam.save();
+  await doc.populate(EXAM_POPULATES[0]);
+  return doc.toObject({ virtuals: true });
 };
 export const updateExamQuestionId = async (
   id: string,
@@ -223,7 +233,9 @@ export const updateExamQuestionId = async (
     question.answers?.push(...input.answers);
   }
 
-  return await exam.save();
+  const doc = await exam.save();
+  await doc.populate(EXAM_POPULATES[0]);
+  return doc.toObject({ virtuals: true });
 };
 
 // delete exam question
@@ -237,13 +249,15 @@ export const deleteExamQuestion = async (id: string, questionId: string) => {
 
   exam.questions?.splice(index, 1);
 
-  return await exam.save();
+  const doc = await exam.save();
+  await doc.populate(EXAM_POPULATES[0]);
+  return doc.toObject({ virtuals: true });
 };
 
 // Delete an exam
 export const deleteExam = async (id: string) => {
-  const exam = await Exam.findById(id);
+  const exam = await Exam.findByIdAndDelete(id).populate(EXAM_POPULATES[0]);
   if (!exam) throw new Error("Exam not found");
 
-  return await Exam.findByIdAndDelete(id);
+  return exam.toObject({ virtuals: true });
 };
