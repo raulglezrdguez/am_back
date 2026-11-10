@@ -66,9 +66,15 @@ export const diagramTypeDefs = `#graphql
         updatedAt: Date!
     }
 
+    type DiagramPage {
+        items: [Diagram!]!
+        nextCursor: String
+        hasMore: Boolean!
+    }
+
     type Query {
         # Obtener todos los diagramas del usuario
-        myDiagrams: [Diagram!]!
+        myDiagrams(cursor: String, limit: Int): DiagramPage!
         # Obtener un diagrama del usuario por ID
         myDiagram(id: ID!): Diagram
         # Obtener los diagramas públicos
@@ -102,8 +108,8 @@ export const diagramTypeDefs = `#graphql
         description: String
         public: Boolean
         result: [ResultInput]
-        nodes: [JSONObject!]! # Usamos JSONObject porque la entrada es compleja y variada
-        edges: [JSONObject!]!
+        nodes: [JSONObject!] # Usamos JSONObject porque la entrada es compleja y variada
+        edges: [JSONObject!]
         viewport: FlowViewportInput
     }
 

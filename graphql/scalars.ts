@@ -1,8 +1,28 @@
 import { GraphQLScalarType, GraphQLError } from "graphql";
 import { Kind } from "graphql/language/index.js";
 
-export const BIRTHDATE_REGEX =
-  /^(?:(?:31-(0[13578]|1[02])-(19|20)\d{2})|(?:29-02-(19|20)(?:04|08|12|16|20|24|28|32|36|40|44|48|52|56|60|64|68|72|76|80|84|88|92|96))|(?:29-02-(19|20)\d{2}(?:(?:[02468][048]|[13579][26]))|(?:30-(0[469]|11)-(19|20)\d{2})|(?:0[1-9]|1\d|2[0-8])-(0[1-9]|1[0-2])-(19|20)\d{2}))$/;
+export const isValidBirthDateDMY = (value: string): boolean => {
+  if (typeof value !== "string") return false;
+  const match = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value);
+  if (!match) return false;
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1) return false;
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+};
+
+// Compatibilidad con el modelo, que solo usa `.test()`
+export const BIRTHDATE_REGEX = {
+  test: (value: string) => isValidBirthDateDMY(value),
+};
 
 // Date scalar type
 export const DateScalar = new GraphQLScalarType({
@@ -79,7 +99,7 @@ export const JSONScalar = new GraphQLScalarType({
           return valueAst.values.map((value: any) => parseLiteralValue(value));
         default:
           throw new GraphQLError(
-            `Unexpected kind in JSON literal: ${valueAst.kind}`
+            `Unexpected kind in JSON literal: ${valueAst.kind}`,
           );
       }
     };
@@ -130,39 +150,37 @@ export const BirthDateScalar = new GraphQLScalarType({
   description: "Birth date as dd-mm-yyyy (valid calendar, leap-years)",
   // valor que se envía al cliente
   serialize(value) {
-    if (!(value instanceof Date)) {
-      throw new TypeError("BirthDate can only serialize Date instances");
+    if (value instanceof Date) return formatBirthDate(value);
+    if (typeof value === "string") {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) return formatBirthDate(date);
     }
-    return formatBirthDate(value);
+    throw new TypeError("BirthDate can only serialize Date instances");
   },
-  // valor que viene como variable
   parseValue(value) {
-    if (typeof value !== "string" || !BIRTHDATE_REGEX.test(value)) {
+    if (typeof value !== "string" || !isValidBirthDateDMY(value)) {
       throw new TypeError("BirthDate must be a valid date string (dd-mm-yyyy)");
     }
-    const [d, m, y] = value.split("-").map(Number);
-    return new Date(y, m - 1, d);
+    return parseBirthDate(value);
   },
-  // valor inline en el query
   parseLiteral(ast) {
-    if (ast.kind !== Kind.STRING || !BIRTHDATE_REGEX.test(ast.value)) {
+    if (ast.kind !== Kind.STRING || !isValidBirthDateDMY(ast.value)) {
       throw new TypeError("BirthDate must be a valid date string (dd-mm-yyyy)");
     }
-    const [d, m, y] = ast.value.split("-").map(Number);
-    return new Date(y, m - 1, d);
+    return parseBirthDate(ast.value);
   },
 });
 
 export const formatBirthDate = (date: Date): string => {
-  const d = String(date.getDate()).padStart(2, "0");
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const y = date.getFullYear();
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const y = date.getUTCFullYear();
   return `${d}-${m}-${y}`;
 };
 
 export const parseBirthDate = (dateStr: string): Date => {
   const [d, m, y] = dateStr.split("-").map(Number);
-  return new Date(y, m - 1, d);
+  return new Date(Date.UTC(y, m - 1, d));
 };
 
 export const scalarsTypeDefs = `#graphql

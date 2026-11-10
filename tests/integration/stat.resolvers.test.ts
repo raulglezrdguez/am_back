@@ -1,22 +1,18 @@
 import jwt from "jsonwebtoken";
 import request from "supertest";
 
-import { app } from "../../index.ts";
+import { createServer } from "../../app.ts";
 import User from "../../models/user.model.ts";
 import Patient from "../../models/patient.model.ts";
 import Exam from "../../models/exam.model.ts";
 import Stat from "../../models/stat.model.ts";
 import { closeTestDB, connectTestDB } from "./setup.ts";
 import { JWT_SECRET } from "../../config/index.ts";
-import { formatBirthDate } from "../../graphql/scalars.ts";
 
-let server: any;
-
+let httpServer: import("http").Server;
 beforeAll(async () => {
   await connectTestDB();
-  server = app.listen(0);
-
-  await new Promise((resolve) => server.once("listening", resolve));
+  ({ httpServer } = await createServer());
 });
 
 afterAll(async () => {
@@ -24,7 +20,7 @@ afterAll(async () => {
 
   await closeTestDB();
 
-  await new Promise((resolve) => server.close(resolve));
+  await new Promise((resolve) => httpServer.close(resolve));
 
   const admin = await import("firebase-admin");
   const apps = admin.apps;
@@ -78,7 +74,7 @@ describe("Stat graphql", () => {
       throw new Error("JWT_SECRET is not defined in environment variables");
     const token = jwt.sign(
       { id: user._id, email: user.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     let query = `{
@@ -106,7 +102,7 @@ describe("Stat graphql", () => {
         }
     }`;
 
-    let res = await request(server)
+    let res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(query))
@@ -157,7 +153,7 @@ describe("Stat graphql", () => {
       throw new Error("JWT_SECRET is not defined in environment variables");
     const token = jwt.sign(
       { id: user._id, email: user.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     let query = `{
@@ -185,7 +181,7 @@ describe("Stat graphql", () => {
         }
     }`;
 
-    let res = await request(server)
+    let res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(query))
@@ -238,7 +234,7 @@ describe("Stat graphql", () => {
       throw new Error("JWT_SECRET is not defined in environment variables");
     const token = jwt.sign(
       { id: user._id, email: user.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     let query = `{
@@ -266,7 +262,7 @@ describe("Stat graphql", () => {
         }
     }`;
 
-    let res = await request(server)
+    let res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(query))
@@ -306,7 +302,7 @@ describe("Stat graphql", () => {
     const patient = await Patient.create({
       identifier: "P001",
       name: "John Doe",
-      birthDate: formatBirthDate(new Date("1990-01-01")),
+      birthDate: "01-01-1990",
       owner: user._id.toString(),
       public: false,
     });
@@ -331,8 +327,8 @@ describe("Stat graphql", () => {
 
     let query = `{
         getStats(filter: {examId: "${exam._id.toString()}", completedAt: "${new Date(
-      "2024-03-01"
-    )}", address: "Address", resultValue: "A"}) {
+          "2024-03-01",
+        )}", address: "Address", resultValue: "A"}) {
             result {
                 value
                 text
@@ -352,8 +348,17 @@ describe("Stat graphql", () => {
         }
     }`;
 
-    let res = await request(server)
+    if (!JWT_SECRET) {
+      throw new Error("JWT_SECRET is not defined in environment variables");
+    }
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: 1, status: 1 },
+      JWT_SECRET,
+    );
+
+    let res = await request(httpServer)
       .post("/graphql")
+      .set("Authorization", `Bearer ${token}`)
       .send(gql(query))
       .expect(200);
 
@@ -367,7 +372,7 @@ describe("Stat graphql", () => {
     expect(getStats[0].exam._id.toString()).toBe(exam._id.toString());
     expect(getStats[0].address).toBe(stat1.address);
     expect(new Date(getStats[0].completedAt).toISOString()).toBe(
-      new Date(stat1.completedAt).toISOString()
+      new Date(stat1.completedAt).toISOString(),
     );
   });
 
@@ -398,7 +403,7 @@ describe("Stat graphql", () => {
       throw new Error("JWT_SECRET is not defined in environment variables");
     const token = jwt.sign(
       { id: user._id, email: user.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     const mutation = `
@@ -431,7 +436,7 @@ describe("Stat graphql", () => {
           }
         `;
 
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
@@ -449,7 +454,7 @@ describe("Stat graphql", () => {
     expect(createStat.exam._id.toString()).toBe(exam._id.toString());
     expect(createStat.address).toBe("Address A");
     expect(new Date(createStat.completedAt).toISOString()).toBe(
-      new Date("2024-01-01").toISOString()
+      new Date("2024-01-01").toISOString(),
     );
   });
 });

@@ -19,7 +19,7 @@ import { loadPopulated } from "./load.ts";
 const EXAM_LIST_PROJECTION =
   "_id title subtitle instructions description author year public createdAt";
 const EXAM_POPULATES = [
-  { path: "author", select: "name email role status createdAt updatedAt" },
+  { path: "author", select: "id name email role status createdAt updatedAt" },
 ];
 const NOT_DELETED = { deletedAt: null };
 
@@ -35,7 +35,7 @@ export const listExams = async (
     ...buildCursorFilter("createdAt", cursor),
   })
     .select(EXAM_LIST_PROJECTION) // ← sin questions/expression
-    .populate("author", "name")
+    .populate(EXAM_POPULATES[0])
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit + 1)
     .lean();
@@ -76,7 +76,7 @@ export const listExamsByAuthor = async (
     ...buildCursorFilter("createdAt", cursor),
   })
     .select(EXAM_LIST_PROJECTION)
-    .populate("author", "name")
+    .populate(EXAM_POPULATES[0])
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit + 1)
     .lean();

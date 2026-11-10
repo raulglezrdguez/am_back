@@ -13,7 +13,8 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "typeRoots": ["./node_modules/@types", "./types"]
+    "typeRoots": ["./node_modules/@types", "./types"],
+    "types": ["jest", "node"]
   },
   "include": ["**/*.ts", "**/*.js", "types/**/*.d.ts", "jest.config.cjs"],
   "exclude": ["node_modules"]

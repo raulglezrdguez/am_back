@@ -1,5 +1,4 @@
-// services/load.ts
-import mongoose, { type Model } from "mongoose";
+import { type Model, type PopulateOptions } from "mongoose";
 
 /**
  * Carga un documento por _id, aplica populate y devuelve un POJO con los
@@ -9,10 +8,10 @@ import mongoose, { type Model } from "mongoose";
 export const loadPopulated = async <T>(
   model: Model<T>,
   id: string,
-  populates: Parameters<Model<T>["populate"]>[0][],
+  populates: PopulateOptions[],
 ) => {
   const doc = await model.findById(id).select("-__v");
   if (!doc) return null;
-  for (const p of populates) await doc.populate(p as any);
+  for (const p of populates) await model.populate(doc, p);
   return doc.toObject({ virtuals: true }); // virtuals: id incluido
 };

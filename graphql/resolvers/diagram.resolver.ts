@@ -8,29 +8,32 @@ import { type ApolloContext } from "../../config/apollo.context.ts";
 export default {
   Query: {
     myDiagrams: (_: any, __: any, { currentUser }: ApolloContext) => {
-      if (!currentUser) return [];
+      if (!currentUser) {
+        return { items: [], nextCursor: null, hasMore: false };
+      }
       return diagramService.listDiagramsByAuthor(currentUser.id);
     },
     myDiagram: (
       _: any,
       { id }: { id: string },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) return null;
       return diagramService.getDiagramByAuthorId(id, currentUser.id);
     },
-    publicDiagrams: () => diagramService.listPublicDiagrams(),
+    publicDiagrams: async () =>
+      (await diagramService.listPublicDiagrams()).items,
     publicDiagram: (_: any, { id }: { id: string }) =>
       diagramService.getPublicDiagramById(id),
-    rootDiagrams: (_: any, __: any, { currentUser }: ApolloContext) => {
+    rootDiagrams: async (_: any, __: any, { currentUser }: ApolloContext) => {
       if (!currentUser) return [];
       if (currentUser.role !== 0) return [];
-      return diagramService.getAllDiagrams();
+      return (await diagramService.getAllDiagrams()).items;
     },
     rootDiagram: (
       _: any,
       { id }: { id: string },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) return null;
       if (currentUser.role !== 0) return null;
@@ -41,7 +44,7 @@ export default {
     createDiagram: (
       _: any,
       { input }: { input: CreateDiagramInput },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
       const diagramInput = { ...input, author: currentUser.id };
@@ -50,13 +53,13 @@ export default {
     updateDiagram: async (
       _: any,
       { id, input }: { id: string; input: Partial<UpdateDiagramInput> },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
       const diagram = await diagramService.getDiagramByAuthorId(
         id,
-        currentUser.id
+        currentUser.id,
       );
       if (!diagram) throw new Error("Diagram not found");
 
@@ -65,7 +68,7 @@ export default {
     deleteDiagram: async (
       _: any,
       { id }: { id: string },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
@@ -79,7 +82,7 @@ export default {
     rootUpdateDiagram: async (
       _: any,
       { id, input }: { id: string; input: Partial<UpdateDiagramInput> },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
@@ -94,7 +97,7 @@ export default {
     rootDeleteDiagram: async (
       _: any,
       { id }: { id: string },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 

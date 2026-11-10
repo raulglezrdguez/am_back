@@ -15,6 +15,10 @@ import type {
 
 const DIAGRAM_LIST_PROJECTION =
   "_id title description author public createdAt updatedAt"; // ← sin nodes/edges/result
+const AUTHOR_POPULATE = "id name email role status createdAt updatedAt";
+
+// Solo para findDiagramsByNode*: el test necesita leer nodes[0]
+const DIAGRAM_NODE_SEARCH_PROJECTION = `${DIAGRAM_LIST_PROJECTION} nodes`;
 
 const toDiagramPage = (rows: any[], limit: number): CursorPage<any> => {
   const hasMore = rows.length > limit;
@@ -39,7 +43,7 @@ export const listDiagramsByAuthor = async (
     ...buildCursorFilter("createdAt", cursor),
   })
     .select(DIAGRAM_LIST_PROJECTION)
-    .populate("author", "name")
+    .populate("author", AUTHOR_POPULATE)
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit + 1)
     .lean();
@@ -56,7 +60,7 @@ export const listPublicDiagrams = async (
     ...buildCursorFilter("createdAt", cursor),
   })
     .select(DIAGRAM_LIST_PROJECTION)
-    .populate("author", "name")
+    .populate("author", AUTHOR_POPULATE)
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit + 1)
     .lean();
@@ -65,9 +69,9 @@ export const listPublicDiagrams = async (
 
 export const getDiagramByAuthorId = async (id: string, authorId: string) => {
   const diagram = await Diagram.findOne({ _id: id })
-    .populate("author", "name")
+    .populate("author", AUTHOR_POPULATE)
     .lean();
-  if (diagram && diagram.author.id.toString() === authorId) {
+  if (diagram && String((diagram.author as any)._id) === authorId) {
     return diagram;
   }
   return null;
@@ -75,7 +79,7 @@ export const getDiagramByAuthorId = async (id: string, authorId: string) => {
 
 export const getPublicDiagramById = async (id: string) => {
   return await Diagram.findOne({ _id: id, public: true })
-    .populate("author", "name")
+    .populate("author", AUTHOR_POPULATE)
     .lean();
 };
 
@@ -83,7 +87,7 @@ export const getAllDiagrams = async (cursor?: string, limitInput?: number) => {
   const limit = clampLimit(limitInput);
   const rows = await Diagram.find({ ...buildCursorFilter("createdAt", cursor) })
     .select(DIAGRAM_LIST_PROJECTION)
-    .populate("author", "name")
+    .populate("author", AUTHOR_POPULATE)
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit + 1)
     .lean();
@@ -91,7 +95,9 @@ export const getAllDiagrams = async (cursor?: string, limitInput?: number) => {
 };
 
 export const getDiagramById = async (id: string) => {
-  return await Diagram.findOne({ _id: id }).populate("author", "name").lean();
+  return await Diagram.findOne({ _id: id })
+    .populate("author", AUTHOR_POPULATE)
+    .lean();
 };
 
 export const createDiagram = async (input: CreateDiagramInput) => {
@@ -100,17 +106,17 @@ export const createDiagram = async (input: CreateDiagramInput) => {
     author: new mongoose.Types.ObjectId(input.author),
   };
   const diagram = await Diagram.create(diagramInput);
-  return diagram.populate("author", "name");
+  return diagram.populate("author", AUTHOR_POPULATE);
 };
 
 export const updateDiagram = async (id: string, input: UpdateDiagramInput) => {
   const diagram = await Diagram.findByIdAndUpdate(id, input, UPDATE_OPTS);
-  return diagram?.populate("author", "name");
+  return diagram?.populate("author", AUTHOR_POPULATE);
 };
 
 export const deleteDiagram = async (id: string) => {
   const diagram = await Diagram.findByIdAndDelete(id);
-  return diagram?.populate("author", "name");
+  return diagram?.populate("author", AUTHOR_POPULATE);
 };
 
 export const findDiagramsByNodeType = async (
@@ -126,8 +132,8 @@ export const findDiagramsByNodeType = async (
       },
     },
   })
-    .select(DIAGRAM_LIST_PROJECTION)
-    .populate("author", "name")
+    .select(DIAGRAM_NODE_SEARCH_PROJECTION)
+    .populate("author", AUTHOR_POPULATE)
     .limit(limit)
     .lean();
 };
@@ -143,8 +149,8 @@ export const findDiagramsByNodeLabel = async (
       $elemMatch: { "data.label": nodeLabel },
     },
   })
-    .select(DIAGRAM_LIST_PROJECTION)
-    .populate("author", "name")
+    .select(DIAGRAM_NODE_SEARCH_PROJECTION)
+    .populate("author", AUTHOR_POPULATE)
     .limit(limit)
     .lean();
 };
@@ -164,8 +170,8 @@ export const findDiagramsByNodeTypeAndLabel = async (
       },
     },
   })
-    .select(DIAGRAM_LIST_PROJECTION)
-    .populate("author", "name")
+    .select(DIAGRAM_NODE_SEARCH_PROJECTION)
+    .populate("author", AUTHOR_POPULATE)
     .limit(limit)
     .lean();
 };

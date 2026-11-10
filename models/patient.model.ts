@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { BIRTHDATE_REGEX, formatBirthDate } from "../graphql/scalars.ts";
+import { isValidBirthDateDMY, formatBirthDate } from "../graphql/scalars.ts";
 
 import {
   MAX_AGE_YEARS,
@@ -26,7 +26,7 @@ const patientSchema = new Schema(
           validator(v: Date) {
             if (!v) return true;
             if (!(v instanceof Date) || isNaN(v.getTime())) return false;
-            return BIRTHDATE_REGEX.test(formatBirthDate(v));
+            return isValidBirthDateDMY(formatBirthDate(v));
           },
           message: "birthDate must be a valid calendar date (dd-mm-yyyy)",
         },
@@ -53,22 +53,12 @@ const patientSchema = new Schema(
         if (!v) return v;
         if (v instanceof Date) {
           if (isNaN(v.getTime())) throw new Error("Invalid birthDate format");
-          // Normaliza a medianoche UTC para que la comparación a nivel de día
-          // sea consistente entre zonas horarias.
           return toUtcMidnight(v);
         }
-        if (typeof v === "string" && BIRTHDATE_REGEX.test(v)) {
+        if (typeof v === "string" && isValidBirthDateDMY(v)) {
           const [d, m, y] = v.split("-").map(Number);
-          const date = new Date(y, m - 1, d);
-          // Verifica que la fecha construida coincida (evita 31-02 → 02-03)
-          if (
-            date.getFullYear() !== y ||
-            date.getMonth() !== m - 1 ||
-            date.getDate() !== d
-          ) {
-            throw new Error("Invalid birthDate format");
-          }
-          return toUtcMidnight(date);
+          // Construir directamente en UTC evita el desplazamiento de día
+          return new Date(Date.UTC(y, m - 1, d));
         }
         throw new Error("Invalid birthDate format");
       },
@@ -81,7 +71,6 @@ const patientSchema = new Schema(
     medicalHistory: { type: String, required: false },
     allergies: { type: [String], required: false, default: [] },
     medications: { type: [String], required: false, default: [] },
-    public: { type: Boolean, required: true, default: false },
     owner: { type: ObjectId, ref: "User", required: true },
     sharedWith: { type: ObjectId, ref: "User", required: false },
     createdAt: { type: Date, default: Date.now },

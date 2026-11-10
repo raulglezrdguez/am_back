@@ -2,6 +2,8 @@
 .vscode/
 node_modules
 .env
+.env.*
+!.env.example
 public
 .cache
 .private
@@ -10,3 +12,5 @@ pages/resources
 work
 coverage
 .DS_Store
+dist/
+

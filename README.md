@@ -20,10 +20,10 @@ This API is deployed to a private environment. Access is restricted to authorize
 
 ## Prerequisites
 
-- Node.js 20.x or later
+- Node.js 24 LTS (mínimo 22.18)
 - MongoDB 6.x (local or Atlas)
 - Firebase project with service account credentials
-- npm, yarn, or pnpm package manager
+- npm package manager
 
 ## Installation
 
@@ -37,11 +37,7 @@ cd back
 ### 2. Install dependencies
 
 ```bash
-npm install
-# or
-yarn install
-# or
-pnpm install
+npm ci
 ```
 
 ### 3. Setup environment variables
@@ -84,12 +80,14 @@ Development mode
 npm run dev
 ```
 
-Starts the server with nodemon and ts-node for hot reloading. The API will be available at http://localhost:4000
+Starts the server with nodemon and ts-node for hot reloading. The API will be available at http://localhost:5050
 
 Production mode
 
 ```bash
-npm start
+  npm ci
+  npm run build
+  npm start
 ```
 
 ## Testing
@@ -129,6 +127,17 @@ Test features
 | `npm test`          | Run all tests with coverage              |
 | `npm run test:unit` | Run unit tests only                      |
 | `npm run test:int`  | Run integration tests only               |
+| `npm run build`     | Build code                               |
+| `npm run typecheck` | Check code                               |
+| `npm run dev`       | Run development server                   |
+| `tsx watch`         | Typescript watch                         |
+
+## Docker
+
+```bash
+  docker build -t am-back .
+  docker run --rm -p 5050:5050 --env-file .env am-back
+```
 
 ## API endpoints
 

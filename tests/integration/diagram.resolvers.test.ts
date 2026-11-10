@@ -1,20 +1,16 @@
 import jwt from "jsonwebtoken";
 import request from "supertest";
 
-import { app } from "../../index.ts";
+import { createServer } from "../../app.ts";
 import User from "../../models/user.model.ts";
 import Diagram from "../../models/diagram.model.ts";
 import { closeTestDB, connectTestDB } from "./setup.ts";
 import { JWT_SECRET } from "../../config/index.ts";
-import e from "express";
 
-let server: any;
-
+let httpServer: import("http").Server;
 beforeAll(async () => {
   await connectTestDB();
-  server = app.listen(0); // puerto aleatorio
-
-  await new Promise((resolve) => server.once("listening", resolve));
+  ({ httpServer } = await createServer());
 });
 
 afterAll(async () => {
@@ -22,7 +18,7 @@ afterAll(async () => {
 
   await closeTestDB();
 
-  await new Promise((resolve) => server.close(resolve));
+  await new Promise((resolve) => httpServer.close(resolve));
 
   const admin = await import("firebase-admin");
   const apps = admin.apps;
@@ -60,36 +56,38 @@ describe("Diagram Resolvers", () => {
       }
       const token = jwt.sign(
         { id: user._id, email: user.email, status: 1, role: 1 },
-        JWT_SECRET
+        JWT_SECRET,
       );
 
       const query = `{
         myDiagrams {
+          items {
             _id
             title
             description
             public
             author {
                 id
-                email
-            }
+                name
+            }          
+          }
         }
-    }`;
+      }`;
 
-      const response = await request(server)
+      const response = await request(httpServer)
         .post("/graphql")
         .set("Authorization", `Bearer ${token}`)
         .send(gql(query));
 
       expect(response.status).toBe(200);
-      const myDiagrams = response.body.data.myDiagrams;
+
+      const myDiagrams = response.body.data.myDiagrams.items;
       expect(myDiagrams).toBeDefined();
       expect(myDiagrams).toHaveLength(1);
       expect(myDiagrams[0].title).toBe("Test Diagram");
       expect(myDiagrams[0].description).toBe("A test diagram");
       expect(myDiagrams[0].public).toBe(false);
       expect(myDiagrams[0].author.id).toBe(user._id.toString());
-      expect(myDiagrams[0].author.email).toBe(user.email);
     });
 
     it("myDiagram query", async () => {
@@ -112,7 +110,7 @@ describe("Diagram Resolvers", () => {
       }
       const token = jwt.sign(
         { id: user._id, email: user.email, status: 1, role: 1 },
-        JWT_SECRET
+        JWT_SECRET,
       );
 
       const query = `{
@@ -123,13 +121,12 @@ describe("Diagram Resolvers", () => {
             public
             author {
               id
-              email
               name
             }
         }
     }`;
 
-      const response = await request(server)
+      const response = await request(httpServer)
         .post("/graphql")
         .set("Authorization", `Bearer ${token}`)
         .send(gql(query));
@@ -141,7 +138,6 @@ describe("Diagram Resolvers", () => {
       expect(myDiagram.description).toBe("A test diagram");
       expect(myDiagram.public).toBe(false);
       expect(myDiagram.author.id).toBe(user._id.toString());
-      expect(myDiagram.author.email).toBe(user.email);
       expect(myDiagram.author.name).toBe(user.name);
     });
 
@@ -168,7 +164,7 @@ describe("Diagram Resolvers", () => {
         },
       ]);
 
-      const query = `{  
+      const query = `{
         publicDiagrams {
             _id
             title
@@ -176,12 +172,13 @@ describe("Diagram Resolvers", () => {
             public
             author {
                 id
-                email
             }
         }
     }`;
 
-      const response = await request(server).post("/graphql").send(gql(query));
+      const response = await request(httpServer)
+        .post("/graphql")
+        .send(gql(query));
 
       expect(response.status).toBe(200);
       const publicDiagrams = response.body.data.publicDiagrams;
@@ -191,7 +188,6 @@ describe("Diagram Resolvers", () => {
       expect(publicDiagrams[0].description).toBe("A public diagram");
       expect(publicDiagrams[0].public).toBe(true);
       expect(publicDiagrams[0].author.id).toBe(user._id.toString());
-      expect(publicDiagrams[0].author.email).toBe(user.email);
     });
 
     it("publicDiagram query", async () => {
@@ -217,12 +213,13 @@ describe("Diagram Resolvers", () => {
             public
             author {
                 id
-                email
             }
         }
     }`;
 
-      const response = await request(server).post("/graphql").send(gql(query));
+      const response = await request(httpServer)
+        .post("/graphql")
+        .send(gql(query));
 
       expect(response.status).toBe(200);
       const publicDiagram = response.body.data.publicDiagram;
@@ -231,7 +228,6 @@ describe("Diagram Resolvers", () => {
       expect(publicDiagram.description).toBe("A public diagram");
       expect(publicDiagram.public).toBe(true);
       expect(publicDiagram.author.id).toBe(user._id.toString());
-      expect(publicDiagram.author.email).toBe(user.email);
     });
 
     it("rootDiagrams query", async () => {
@@ -269,7 +265,7 @@ describe("Diagram Resolvers", () => {
       }
       const token = jwt.sign(
         { id: adminUser._id, email: adminUser.email, status: 1, role: 0 },
-        JWT_SECRET
+        JWT_SECRET,
       );
 
       const query = `{
@@ -280,12 +276,11 @@ describe("Diagram Resolvers", () => {
             public
             author {
                 id
-                email
             }
         }
     }`;
 
-      const response = await request(server)
+      const response = await request(httpServer)
         .post("/graphql")
         .set("Authorization", `Bearer ${token}`)
         .send(gql(query));
@@ -322,7 +317,7 @@ describe("Diagram Resolvers", () => {
       }
       const token = jwt.sign(
         { id: adminUser._id, email: adminUser.email, status: 1, role: 0 },
-        JWT_SECRET
+        JWT_SECRET,
       );
 
       const query = `{
@@ -333,12 +328,11 @@ describe("Diagram Resolvers", () => {
             public
             author {
                 id
-                email
             }
         }
     }`;
 
-      const response = await request(server)
+      const response = await request(httpServer)
         .post("/graphql")
         .set("Authorization", `Bearer ${token}`)
         .send(gql(query));
@@ -350,7 +344,6 @@ describe("Diagram Resolvers", () => {
       expect(rootDiagram.description).toBe("Diagram by user");
       expect(rootDiagram.public).toBe(false);
       expect(rootDiagram.author.id).toBe(normalUser._id.toString());
-      expect(rootDiagram.author.email).toBe(normalUser.email);
     });
   });
 
@@ -368,14 +361,16 @@ describe("Diagram Resolvers", () => {
       }
       const token = jwt.sign(
         { id: user._id, email: user.email, status: 1, role: 1 },
-        JWT_SECRET
+        JWT_SECRET,
       );
 
       const mutation = `mutation {
         createDiagram(input: {
             title: "New Diagram",
             description: "A newly created diagram",
-            public: true
+            public: true,
+            nodes: [],
+            edges: []
         }) {
             _id
             title
@@ -383,12 +378,11 @@ describe("Diagram Resolvers", () => {
             public
             author {
                 id
-                email
             }
         }
     }`;
 
-      const response = await request(server)
+      const response = await request(httpServer)
         .post("/graphql")
         .set("Authorization", `Bearer ${token}`)
         .send(gql(mutation));
@@ -400,7 +394,6 @@ describe("Diagram Resolvers", () => {
       expect(createdDiagram.description).toBe("A newly created diagram");
       expect(createdDiagram.public).toBe(true);
       expect(createdDiagram.author.id).toBe(user._id.toString());
-      expect(createdDiagram.author.email).toBe(user.email);
     });
 
     it("fails to create diagram when not authenticated", async () => {
@@ -408,7 +401,9 @@ describe("Diagram Resolvers", () => {
         createDiagram(input: {
             title: "New Diagram",
             description: "A newly created diagram",
-            public: true
+            public: true,
+            nodes: [],
+            edges: []
         }) {
             _id
             title
@@ -421,7 +416,7 @@ describe("Diagram Resolvers", () => {
         }
     }`;
 
-      const response = await request(server)
+      const response = await request(httpServer)
         .post("/graphql")
         .send(gql(mutation));
 
@@ -435,7 +430,9 @@ describe("Diagram Resolvers", () => {
         createDiagram(input: {
             title: "New Diagram",
             description: "A newly created diagram",
-            public: true
+            public: true,
+            nodes: [],
+            edges: []
         }) {
             _id
             title
@@ -443,12 +440,11 @@ describe("Diagram Resolvers", () => {
             public
             author {
                 id
-                email
             }
         }
     }`;
 
-      const response = await request(server)
+      const response = await request(httpServer)
         .post("/graphql")
         .set("Authorization", `Bearer invalidtoken`)
         .send(gql(mutation));
@@ -471,13 +467,15 @@ describe("Diagram Resolvers", () => {
       }
       const token = jwt.sign(
         { id: user._id, email: user.email, status: 1, role: 1 },
-        JWT_SECRET
+        JWT_SECRET,
       );
 
       const mutation = `mutation {
         createDiagram(input: {
             description: "A newly created diagram without title",
-            public: true
+            public: true,
+            nodes: [],
+            edges: []
         }) {
             _id
             title
@@ -485,12 +483,11 @@ describe("Diagram Resolvers", () => {
             public
             author {
                 id
-                email
             }
         }
     }`;
 
-      const response = await request(server)
+      const response = await request(httpServer)
         .post("/graphql")
         .set("Authorization", `Bearer ${token}`)
         .send(gql(mutation));
@@ -498,7 +495,7 @@ describe("Diagram Resolvers", () => {
       expect(response.status).toBe(400);
       expect(response.body.errors).toBeDefined();
       expect(response.body.errors[0].message).toContain(
-        'Field "CreateDiagramInput.title" of required type "String!" was not provided.'
+        'Field "CreateDiagramInput.title" of required type "String!" was not provided.',
       );
     });
 
@@ -508,14 +505,16 @@ describe("Diagram Resolvers", () => {
       }
       const token = jwt.sign(
         { id: "609e129e1c4ae12f34567890", email: "nonexistent@example.com" },
-        JWT_SECRET
+        JWT_SECRET,
       );
 
       const mutation = `mutation {
         createDiagram(input: {
             title: "New Diagram",
             description: "A newly created diagram",
-            public: true
+            public: true,
+            nodes: [],
+            edges: []
         }) {
             _id
             title
@@ -523,12 +522,11 @@ describe("Diagram Resolvers", () => {
             public
             author {
                 id
-                email
             }
         }
     }`;
 
-      const response = await request(server)
+      const response = await request(httpServer)
         .post("/graphql")
         .set("Authorization", `Bearer ${token}`)
         .send(gql(mutation));
@@ -536,7 +534,7 @@ describe("Diagram Resolvers", () => {
       expect(response.status).toBe(200);
       expect(response.body.errors).toBeDefined();
       expect(response.body.errors[0].message).toContain(
-        "Authentication required"
+        "Authentication required",
       );
     });
   });
@@ -562,7 +560,7 @@ describe("Diagram Resolvers", () => {
       }
       const token = jwt.sign(
         { id: user._id, email: user.email, status: 1, role: 1 },
-        JWT_SECRET
+        JWT_SECRET,
       );
 
       const mutation = `mutation {
@@ -577,12 +575,11 @@ describe("Diagram Resolvers", () => {
             public
             author {
                 id
-                email
             }
         }
     }`;
 
-      const response = await request(server)
+      const response = await request(httpServer)
         .post("/graphql")
         .set("Authorization", `Bearer ${token}`)
         .send(gql(mutation));
@@ -594,7 +591,6 @@ describe("Diagram Resolvers", () => {
       expect(updatedDiagram.description).toBe("An updated diagram");
       expect(updatedDiagram.public).toBe(true);
       expect(updatedDiagram.author.id).toBe(user._id.toString());
-      expect(updatedDiagram.author.email).toBe(user.email);
     });
 
     it("fails to update diagram when not authenticated", async () => {
@@ -610,12 +606,11 @@ describe("Diagram Resolvers", () => {
             public
             author {
                 id
-                email
             }
         }
     }`;
 
-      const response = await request(server)
+      const response = await request(httpServer)
         .post("/graphql")
         .send(gql(mutation));
 
@@ -646,7 +641,7 @@ describe("Diagram Resolvers", () => {
       }
       const token = jwt.sign(
         { id: user._id, email: user.email, status: 1, role: 1 },
-        JWT_SECRET
+        JWT_SECRET,
       );
 
       const mutation = `mutation {
@@ -657,12 +652,11 @@ describe("Diagram Resolvers", () => {
             public
             author {
                 id
-                email
             }
         }
     }`;
 
-      const response = await request(server)
+      const response = await request(httpServer)
         .post("/graphql")
         .set("Authorization", `Bearer ${token}`)
         .send(gql(mutation));
@@ -682,12 +676,11 @@ describe("Diagram Resolvers", () => {
             public
             author {
                 id
-                email
             }
         }
     }`;
 
-      const response = await request(server)
+      const response = await request(httpServer)
         .post("/graphql")
         .send(gql(mutation));
 
@@ -709,7 +702,7 @@ describe("Diagram Resolvers", () => {
       }
       const token = jwt.sign(
         { id: user._id, email: user.email, status: 1, role: 1 },
-        JWT_SECRET
+        JWT_SECRET,
       );
 
       const mutation = `mutation {
@@ -720,12 +713,11 @@ describe("Diagram Resolvers", () => {
             public
             author {
                 id
-                email
             }
         }
     }`;
 
-      const response = await request(server)
+      const response = await request(httpServer)
         .post("/graphql")
         .set("Authorization", `Bearer ${token}`)
         .send(gql(mutation));
@@ -762,7 +754,7 @@ describe("Diagram Resolvers", () => {
       }
       const token = jwt.sign(
         { id: otherUser._id, email: otherUser.email, status: 1, role: 1 },
-        JWT_SECRET
+        JWT_SECRET,
       );
 
       const mutation = `mutation {
@@ -773,12 +765,11 @@ describe("Diagram Resolvers", () => {
             public
             author {
                 id
-                email
             }
         }
     }`;
 
-      const response = await request(server)
+      const response = await request(httpServer)
         .post("/graphql")
         .set("Authorization", `Bearer ${token}`)
         .send(gql(mutation));
@@ -786,7 +777,7 @@ describe("Diagram Resolvers", () => {
       expect(response.status).toBe(200);
       expect(response.body.errors).toBeDefined();
       expect(response.body.errors[0].message).toBe(
-        "Not authorized to delete this diagram"
+        "Not authorized to delete this diagram",
       );
     });
   });

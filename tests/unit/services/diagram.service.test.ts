@@ -1,20 +1,14 @@
-import mongoose, { Types } from "mongoose";
-import { MongoMemoryServer } from "mongodb-memory-server";
-
+import { closeTestDB, connectTestDB } from "./setup.ts";
 import Diagram from "../../../models/diagram.model.ts";
 import User from "../../../models/user.model.ts";
 import * as diagramService from "../../../services/diagram.service.ts";
 
-let mongoServer: MongoMemoryServer;
-
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  await mongoose.connect(mongoServer.getUri());
+  await connectTestDB();
 });
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  await closeTestDB();
 });
 
 afterEach(async () => {
@@ -82,7 +76,7 @@ describe("Diagram service", () => {
     };
     const updatedDiagram = await diagramService.updateDiagram(
       diagram._id.toString(),
-      updatedData
+      updatedData,
     );
     expect(updatedDiagram).toBeDefined();
     expect(updatedDiagram?.title).toBe(updatedData.title);
@@ -104,12 +98,12 @@ describe("Diagram service", () => {
       author: user._id.toString(),
     });
     const deletedDiagram = await diagramService.deleteDiagram(
-      diagram._id.toString()
+      diagram._id.toString(),
     );
     expect(deletedDiagram).toBeDefined();
     expect(deletedDiagram?._id.toString()).toBe(diagram._id.toString());
     const foundDiagram = await diagramService.getDiagramById(
-      diagram._id.toString()
+      diagram._id.toString(),
     );
     expect(foundDiagram).toBeNull();
   });
@@ -133,11 +127,9 @@ describe("Diagram service", () => {
       public: true,
       author: user._id.toString(),
     });
-    const diagrams = await diagramService.listDiagramsByAuthor(
-      user._id.toString()
-    );
-    expect(diagrams.length).toBe(2);
-    const titles = diagrams.map((d) => d.title);
+    const page = await diagramService.listDiagramsByAuthor(user._id.toString());
+    expect(page.items).toHaveLength(2);
+    const titles = page.items.map((d) => d.title);
     expect(titles).toContain("Diagram 1");
     expect(titles).toContain("Diagram 2");
   });
@@ -161,9 +153,9 @@ describe("Diagram service", () => {
       public: true,
       author: user._id.toString(),
     });
-    const diagrams = await diagramService.listPublicDiagrams();
-    expect(diagrams.length).toBe(1);
-    expect(diagrams[0].title).toBe("Public Diagram");
+    const page = await diagramService.listPublicDiagrams();
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0].title).toBe("Public Diagram");
   });
 
   it("should get diagram by id", async () => {
@@ -180,7 +172,7 @@ describe("Diagram service", () => {
       author: user._id.toString(),
     });
     const foundDiagram = await diagramService.getDiagramById(
-      diagram._id.toString()
+      diagram._id.toString(),
     );
     expect(foundDiagram).toBeDefined();
     expect(foundDiagram?.title).toBe("GetById Diagram");
@@ -202,7 +194,7 @@ describe("Diagram service", () => {
     });
     const result = await diagramService.getDiagramByAuthorId(
       diagram._id.toString(),
-      user._id.toString()
+      user._id.toString(),
     );
     expect(result).toBeDefined();
     expect(result?.title).toBe("GetByAuthorId Diagram");
@@ -229,7 +221,7 @@ describe("Diagram service", () => {
       author: user._id.toString(),
     });
     const result = await diagramService.getPublicDiagramById(
-      diagram._id.toString()
+      diagram._id.toString(),
     );
     expect(result).toBeDefined();
     expect(result?.title).toBe("GetPublicById Diagram");
@@ -255,9 +247,9 @@ describe("Diagram service", () => {
       public: false,
       author: user._id.toString(),
     });
-    const diagrams = await diagramService.getAllDiagrams();
-    expect(diagrams.length).toBe(2);
-    const titles = diagrams.map((d) => d.title);
+    const page = await diagramService.getAllDiagrams();
+    expect(page.items).toHaveLength(2);
+    const titles = page.items.map((d) => d.title);
     expect(titles).toContain("Diagram One");
     expect(titles).toContain("Diagram Two");
   });
@@ -387,7 +379,7 @@ describe("Diagram service", () => {
     });
     const diagrams = await diagramService.findDiagramsByNodeTypeAndLabel(
       "TypeX",
-      "LabelY"
+      "LabelY",
     );
     expect(diagrams.length).toBe(1);
     expect(diagrams[0].title).toBe("Diagram with TypeX and LabelY");

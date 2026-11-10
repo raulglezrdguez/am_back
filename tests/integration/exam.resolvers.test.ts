@@ -2,19 +2,16 @@ import jwt from "jsonwebtoken";
 import request from "supertest";
 import { Types } from "mongoose";
 
-import { app } from "../../index.ts";
+import { createServer } from "../../app.ts";
 import User from "../../models/user.model.ts";
 import Exam from "../../models/exam.model.ts";
 import { closeTestDB, connectTestDB } from "./setup.ts";
 import { JWT_SECRET } from "../../config/index.ts";
 
-let server: any;
-
+let httpServer: import("http").Server;
 beforeAll(async () => {
   await connectTestDB();
-  server = app.listen(0); // puerto aleatorio
-
-  await new Promise((resolve) => server.once("listening", resolve));
+  ({ httpServer } = await createServer());
 });
 
 afterAll(async () => {
@@ -22,7 +19,7 @@ afterAll(async () => {
 
   await closeTestDB();
 
-  await new Promise((resolve) => server.close(resolve));
+  await new Promise((resolve) => httpServer.close(resolve));
 
   const admin = await import("firebase-admin");
   const apps = admin.apps;
@@ -67,7 +64,7 @@ describe("Exam GraphQL", () => {
       questions: [],
     });
     const query = `{ exams { _id title public author { name email } } }`;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .send(gql(query))
       .expect(200);
@@ -128,11 +125,11 @@ describe("Exam GraphQL", () => {
     }
     const token = jwt.sign(
       { id: bob._id, email: bob.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     let query = `{ exam(id: "${exam1._id.toString()}") { title author { email } } }`;
-    let res = await request(server)
+    let res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(query))
@@ -142,17 +139,23 @@ describe("Exam GraphQL", () => {
     expect(res.body.data.exam.author.email).toBe(bob.email);
 
     query = `{ exam(id: "${exam1._id.toString()}") { title author { email } } }`;
-    res = await request(server).post("/graphql").send(gql(query)).expect(200);
+    res = await request(httpServer)
+      .post("/graphql")
+      .send(gql(query))
+      .expect(200);
     expect(res.body.data.exam).toBeNull();
 
     query = `{ exam(id: "${exam2._id.toString()}") { title author { email } } }`;
-    res = await request(server).post("/graphql").send(gql(query)).expect(200);
+    res = await request(httpServer)
+      .post("/graphql")
+      .send(gql(query))
+      .expect(200);
     expect(res.body.data.exam).toBeDefined();
     expect(res.body.data.exam.title).toBe(exam2.title);
     expect(res.body.data.exam.author.email).toBe(ana.email);
 
     query = `{ exam(id: "${exam2._id.toString()}") { title author { email } } }`;
-    res = await request(server)
+    res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(query))
@@ -162,7 +165,7 @@ describe("Exam GraphQL", () => {
     expect(res.body.data.exam.author.email).toBe(ana.email);
 
     query = `{ exam(id: "${exam3._id.toString()}") { title author { email } } }`;
-    res = await request(server)
+    res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(query))
@@ -222,11 +225,11 @@ describe("Exam GraphQL", () => {
     }
     const token = jwt.sign(
       { id: charlie._id, email: charlie.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     const query = `{ myExams { title author { email } } }`;
-    let res = await request(server)
+    let res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(query))
@@ -240,7 +243,10 @@ describe("Exam GraphQL", () => {
       expect(exam.author.email).toBe(charlie.email);
     });
 
-    res = await request(server).post("/graphql").send(gql(query)).expect(200);
+    res = await request(httpServer)
+      .post("/graphql")
+      .send(gql(query))
+      .expect(200);
     expect(res.body.data.myExams).toHaveLength(0);
   });
 
@@ -257,12 +263,12 @@ describe("Exam GraphQL", () => {
     }
     const token = jwt.sign(
       { id: eve._id, email: eve.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     const mutation = `
       mutation {
-        createExam(input: { 
+        createExam(input: {
           title: "Eve's Exam",
           subtitle: "Subtitle",
           description: "Description",
@@ -279,7 +285,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
@@ -310,7 +316,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .send(gql(mutation))
       .expect(200);
@@ -338,7 +344,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer invalid.token.here`)
       .send(gql(mutation))
@@ -371,7 +377,7 @@ describe("Exam GraphQL", () => {
     }
     const token = jwt.sign(
       { id: frank._id, email: frank.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     const mutation = `
@@ -393,7 +399,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
@@ -438,7 +444,7 @@ describe("Exam GraphQL", () => {
     }
     const token = jwt.sign(
       { id: henry._id, email: henry.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     const mutation = `
@@ -451,7 +457,7 @@ describe("Exam GraphQL", () => {
       }
     `;
 
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
@@ -489,7 +495,7 @@ describe("Exam GraphQL", () => {
       }
     `;
 
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .send(gql(mutation))
       .expect(200);
@@ -521,7 +527,7 @@ describe("Exam GraphQL", () => {
     }
     const token = jwt.sign(
       { id: jack._id, email: jack.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     const mutation = `
@@ -547,7 +553,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
@@ -593,7 +599,7 @@ describe("Exam GraphQL", () => {
     }
     const token = jwt.sign(
       { id: lucas._id, email: lucas.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     const mutation = `
@@ -614,7 +620,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
@@ -660,7 +666,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .send(gql(mutation))
       .expect(200);
@@ -701,7 +707,7 @@ describe("Exam GraphQL", () => {
     }
     const token = jwt.sign(
       { id: nina._id, email: nina.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     const mutation = `
@@ -725,7 +731,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
@@ -780,7 +786,7 @@ describe("Exam GraphQL", () => {
     }
     const token = jwt.sign(
       { id: paul._id, email: paul.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     const mutation = `
@@ -799,7 +805,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
@@ -852,7 +858,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .send(gql(mutation))
       .expect(200);
@@ -884,7 +890,7 @@ describe("Exam GraphQL", () => {
     }
     const token = jwt.sign(
       { id: jack._id, email: jack.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     const mutation = `
@@ -936,7 +942,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
@@ -951,7 +957,7 @@ describe("Exam GraphQL", () => {
     expect(updatedExam.questions[0].expression.value).toBe("42");
     expect(updatedExam.questions[0].expression.label).toBe("The Answer");
     expect(updatedExam.questions[0].expression.reference).toBe(
-      "Hitchhiker's Guide"
+      "Hitchhiker's Guide",
     );
     expect(updatedExam.questions[0].expression.variable).toBe("answer");
     expect(updatedExam.questions[0].answer).toBe("RADIO");
@@ -995,7 +1001,7 @@ describe("Exam GraphQL", () => {
     }
     const token = jwt.sign(
       { id: lucas._id, email: lucas.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     const mutation = `
@@ -1031,14 +1037,14 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
       .expect(200);
     expect(res.body.errors).toBeDefined();
     expect(res.body.errors[0].message).toBe(
-      "Not authorized to create question to this exam"
+      "Not authorized to create question to this exam",
     );
   });
 
@@ -1090,7 +1096,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .send(gql(mutation))
       .expect(200);
@@ -1144,7 +1150,7 @@ describe("Exam GraphQL", () => {
     }
     const token = jwt.sign(
       { id: nina._id, email: nina.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     const mutation = `
@@ -1190,7 +1196,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
@@ -1205,7 +1211,7 @@ describe("Exam GraphQL", () => {
     expect(updatedExam.questions[0].expression.value).toBe("43");
     expect(updatedExam.questions[0].expression.label).toBe("Not The Answer");
     expect(updatedExam.questions[0].expression.reference).toBe(
-      "Some Other Book"
+      "Some Other Book",
     );
     expect(updatedExam.questions[0].expression.variable).toBe("not_answer");
     expect(updatedExam.questions[0].answer).toBe("TEXT");
@@ -1268,7 +1274,7 @@ describe("Exam GraphQL", () => {
     }
     const token = jwt.sign(
       { id: paul._id, email: paul.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     const mutation = `
@@ -1298,14 +1304,14 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
       .expect(200);
     expect(res.body.errors).toBeDefined();
     expect(res.body.errors[0].message).toBe(
-      "Not authorized to update question to this exam"
+      "Not authorized to update question to this exam",
     );
   });
 
@@ -1377,7 +1383,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .send(gql(mutation))
       .expect(200);
@@ -1431,7 +1437,7 @@ describe("Exam GraphQL", () => {
     }
     const token = jwt.sign(
       { id: ryan._id, email: ryan.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     const mutation = `
@@ -1443,7 +1449,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
@@ -1505,7 +1511,7 @@ describe("Exam GraphQL", () => {
     }
     const token = jwt.sign(
       { id: tom._id, email: tom.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     const mutation = `
@@ -1517,14 +1523,14 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
       .expect(200);
     expect(res.body.errors).toBeDefined();
     expect(res.body.errors[0].message).toBe(
-      "Not authorized to delete question from this exam"
+      "Not authorized to delete question from this exam",
     );
   });
 
@@ -1578,7 +1584,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .send(gql(mutation))
       .expect(200);
@@ -1610,7 +1616,7 @@ describe("Exam GraphQL", () => {
     }
     const token = jwt.sign(
       { id: victor._id, email: victor.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     const mutation = `
@@ -1620,7 +1626,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
@@ -1663,7 +1669,7 @@ describe("Exam GraphQL", () => {
     }
     const token = jwt.sign(
       { id: xander._id, email: xander.email, status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
 
     const mutation = `
@@ -1673,14 +1679,14 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
       .expect(200);
     expect(res.body.errors).toBeDefined();
     expect(res.body.errors[0].message).toBe(
-      "Not authorized to delete this exam"
+      "Not authorized to delete this exam",
     );
   });
 
@@ -1710,7 +1716,7 @@ describe("Exam GraphQL", () => {
         }
       }
     `;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .send(gql(mutation))
       .expect(200);

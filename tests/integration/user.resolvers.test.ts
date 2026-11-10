@@ -1,18 +1,15 @@
 import jwt from "jsonwebtoken";
 import request from "supertest";
 
-import { app } from "../../index.ts";
+import { createServer } from "../../app.ts";
 import User from "../../models/user.model.ts";
 import { JWT_SECRET } from "../../config/index.ts";
 import { closeTestDB, connectTestDB } from "./setup.ts";
 
-let server: any;
-
+let httpServer: import("http").Server;
 beforeAll(async () => {
   await connectTestDB();
-  server = app.listen(0); // puerto aleatorio
-
-  await new Promise((resolve) => server.once("listening", resolve));
+  ({ httpServer } = await createServer());
 });
 
 afterAll(async () => {
@@ -20,7 +17,7 @@ afterAll(async () => {
 
   await closeTestDB();
 
-  await new Promise((resolve) => server.close(resolve));
+  await new Promise((resolve) => httpServer.close(resolve));
 
   const admin = await import("firebase-admin");
   const apps = admin.apps;
@@ -48,10 +45,10 @@ describe("User GraphQL", () => {
     }
     const token = jwt.sign(
       { id: u._id, email: "diana@test.com", status: 1, role: 0 },
-      JWT_SECRET
+      JWT_SECRET,
     );
     const query = `{ users { id name } }`;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(query))
@@ -74,10 +71,10 @@ describe("User GraphQL", () => {
     }
     const token = jwt.sign(
       { id: u._id, email: "diana@test.com", status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
     const query = `{ users { id name } }`;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(query))
@@ -88,7 +85,7 @@ describe("User GraphQL", () => {
   it("users query (without token) → returns error", async () => {
     await User.create({ name: "Eve", email: "eve@test.com", password: "1234" });
     const query = `{ users { id name } }`;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .send(gql(query))
       .expect(200);
@@ -111,10 +108,10 @@ describe("User GraphQL", () => {
     }
     const token = jwt.sign(
       { id: u._id, email: "diana@test.com", status: 1, role: 0 },
-      JWT_SECRET
+      JWT_SECRET,
     );
     const query = `{ user(id: "${u._id}") { id email name createdAt } }`;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(query))
@@ -135,10 +132,10 @@ describe("User GraphQL", () => {
     }
     const token = jwt.sign(
       { id: u._id, email: "diana@test.com", status: 1, role: 1 },
-      JWT_SECRET
+      JWT_SECRET,
     );
     const query = `{ user(id: "${u._id}") { id name } }`;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(query))
@@ -154,7 +151,7 @@ describe("User GraphQL", () => {
       password: "1234",
     });
     const query = `{ user(id: "${u._id}") { id name } }`;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .send(gql(query))
       .expect(200);
@@ -172,7 +169,7 @@ describe("User GraphQL", () => {
             email
           }
         }`;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .send(gql(mutation))
       .expect(200);
@@ -203,7 +200,7 @@ describe("User GraphQL", () => {
     }
     const token = jwt.sign(
       { id: root._id, email: "admin@test.com", status: 1, role: 0 },
-      JWT_SECRET
+      JWT_SECRET,
     );
     const mutation = `
         mutation {
@@ -213,7 +210,7 @@ describe("User GraphQL", () => {
             email
           }
         }`;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
@@ -245,7 +242,7 @@ describe("User GraphQL", () => {
     }
     const token = jwt.sign(
       { id: root._id, email: "admin@test.com", status: 1, role: 0 },
-      JWT_SECRET
+      JWT_SECRET,
     );
     const mutation = `
         mutation {
@@ -257,7 +254,7 @@ describe("User GraphQL", () => {
             status
           }
         }`;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
@@ -291,7 +288,7 @@ describe("User GraphQL", () => {
     }
     const token = jwt.sign(
       { id: root._id, email: "admin@test.com", status: 1, role: 0 },
-      JWT_SECRET
+      JWT_SECRET,
     );
     const mutation = `
         mutation {
@@ -303,7 +300,7 @@ describe("User GraphQL", () => {
             role
           }
         }`;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))
@@ -337,7 +334,7 @@ describe("User GraphQL", () => {
     }
     const token = jwt.sign(
       { id: root._id, email: "admin@test.com", status: 1, role: 0 },
-      JWT_SECRET
+      JWT_SECRET,
     );
     const mutation = `
         mutation {
@@ -349,7 +346,7 @@ describe("User GraphQL", () => {
             role
           }
         }`;
-    const res = await request(server)
+    const res = await request(httpServer)
       .post("/graphql")
       .set("Authorization", `Bearer ${token}`)
       .send(gql(mutation))

@@ -9,23 +9,24 @@ import { type ApolloContext } from "../../config/apollo.context.ts";
 
 export default {
   Query: {
-    exams: () => examService.listExams(),
+    exams: async () => (await examService.listExams()).items,
     exam: (_: any, { id }: { id: string }, { currentUser }: ApolloContext) => {
       if (!currentUser) {
         return examService.getExamById(id, null);
       }
       return examService.getExamById(id, currentUser.id);
     },
-    myExams: (_: any, __: any, { currentUser }: ApolloContext) => {
+    myExams: async (_: any, __: any, { currentUser }: ApolloContext) => {
       if (!currentUser) return [];
-      return examService.listExamsByAuthor(currentUser.id);
+      return (await examService.listExamsByAuthor(currentUser.id)).items;
     },
   },
+
   Mutation: {
     createExam: (
       _: any,
       { input }: { input: CreateExamInput },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
       const examInput = { ...input, author: currentUser.id };
@@ -34,7 +35,7 @@ export default {
     updateExamProperties: async (
       _: any,
       { id, input }: { id: string; input: Partial<UpdateExamPropertiesInput> },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
@@ -48,7 +49,7 @@ export default {
     createExamExpression: async (
       _: any,
       { id, input }: { id: string; input: ExpressionInput[] },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
@@ -62,7 +63,7 @@ export default {
     updateExamExpression: async (
       _: any,
       { id, input }: { id: string; input: ExpressionInput },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
@@ -76,7 +77,7 @@ export default {
     deleteExamExpression: async (
       _: any,
       { id, expressionId }: { id: string; expressionId: string },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
@@ -90,7 +91,7 @@ export default {
     createExamQuestion: async (
       _: any,
       { id, input }: { id: string; input: QuestionInput[] },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
@@ -104,7 +105,7 @@ export default {
     updateExamQuestion: async (
       _: any,
       { id, input }: { id: string; input: QuestionInput },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
@@ -122,7 +123,7 @@ export default {
         questionId,
         input,
       }: { id: string; questionId: string; input: QuestionInput },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
@@ -136,7 +137,7 @@ export default {
     deleteExamQuestion: async (
       _: any,
       { id, questionId }: { id: string; questionId: string },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 
@@ -150,7 +151,7 @@ export default {
     deleteExam: async (
       _: any,
       { id }: { id: string },
-      { currentUser }: ApolloContext
+      { currentUser }: ApolloContext,
     ) => {
       if (!currentUser) throw new Error("Authentication required");
 

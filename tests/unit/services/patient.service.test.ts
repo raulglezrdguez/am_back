@@ -1,6 +1,6 @@
-import mongoose, { Types } from "mongoose";
-import { MongoMemoryServer } from "mongodb-memory-server";
+import { Types } from "mongoose";
 
+import { closeTestDB, connectTestDB } from "./setup.ts";
 import User from "../../../models/user.model.ts";
 import Patient from "../../../models/patient.model.ts";
 
@@ -11,17 +11,19 @@ import type {
 } from "../../../types/patient.d.ts";
 import { Sex } from "../../../types/patient_enums.ts";
 import { formatBirthDate } from "../../../graphql/scalars.ts";
+import type { StatActor } from "../../../services/stat.policy.ts";
 
-let mongoServer: MongoMemoryServer;
+const actorOf = (user: { _id: Types.ObjectId; role?: number }): StatActor => ({
+  id: user._id.toString(),
+  role: user.role ?? 1,
+});
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  await mongoose.connect(mongoServer.getUri());
+  await connectTestDB();
 });
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  await closeTestDB();
 });
 
 afterEach(async () => {
@@ -53,9 +55,9 @@ describe("PatientService", () => {
       public: false,
     });
 
-    const patients = await PatientService.listPatients(user1._id.toString());
-    expect(patients.length).toBe(1);
-    expect(patients[0].identifier).toBe("P001");
+    const page = await PatientService.listPatients(user1._id.toString());
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0].identifier).toBe("P001");
   });
 
   it("should get patient by ID only if it belongs to the owner", async () => {
@@ -85,14 +87,14 @@ describe("PatientService", () => {
 
     const fetchedPatient = await PatientService.getPatient(
       patient1._id.toString(),
-      user1._id.toString()
+      user1._id.toString(),
     );
     expect(fetchedPatient).not.toBeNull();
     expect(fetchedPatient?.identifier).toBe("P001");
 
     const fetchedPatientInvalid = await PatientService.getPatient(
       patient2._id.toString(),
-      user1._id.toString()
+      user1._id.toString(),
     );
     expect(fetchedPatientInvalid).toBeNull();
   });
@@ -128,15 +130,21 @@ describe("PatientService", () => {
       public: true,
     });
 
-    const patientsByIdentifier = await PatientService.getPatientBy("P001", "");
-    expect(patientsByIdentifier.length).toBe(1);
-    expect(patientsByIdentifier[0].identifier).toBe("P001");
+    const byIdentifier = await PatientService.getPatientBy(
+      "P001",
+      "",
+      user1._id.toString(),
+    );
+    expect(byIdentifier).toHaveLength(1);
+    expect(byIdentifier[0].identifier).toBe("P001");
 
-    const patientsByName = await PatientService.getPatientBy("", "John");
-    expect(patientsByName.length).toBe(2);
-    const names = patientsByName.map((p) => p.name);
-    expect(names).toContain("John Doe");
-    expect(names).toContain("John Smith");
+    const byName = await PatientService.getPatientBy(
+      "",
+      "John",
+      user1._id.toString(),
+    );
+    expect(byName).toHaveLength(1); // P003 pertenece a user2: ya no se devuelve
+    expect(byName[0].identifier).toBe("P001");
   });
 
   it("should create a new patient", async () => {
@@ -148,22 +156,18 @@ describe("PatientService", () => {
     const input: CreatePatientInput = {
       identifier: "P001",
       name: "John Doe",
-      birthDate: formatBirthDate(new Date("1990-01-01")),
+      birthDate: "01-01-1990", // literal: no depende de TZ
       sex: Sex.MALE,
-      public: false,
       owner: user._id.toString(),
     };
 
     const patient = await PatientService.createPatient({ ...input });
-
     if (!patient) throw new Error("Patient creation failed");
 
-    expect(patient).toBeDefined();
     expect(patient.identifier).toBe(input.identifier);
     expect(patient.name).toBe(input.name);
-    expect(patient.birthDate!.toString()).toBe(input.birthDate);
+    expect(formatBirthDate(patient.birthDate as Date)).toBe(input.birthDate);
     expect(patient.sex).toBe(input.sex);
-    expect(patient.public).toBe(input.public);
     expect(patient.owner._id.toString()).toBe(user._id.toString());
   });
 
@@ -182,23 +186,29 @@ describe("PatientService", () => {
 
     const updateInput: UpdatePatientInput = {
       name: "John Updated",
-      public: true,
     };
 
     const updatedPatient = await PatientService.updatePatient(
       patient._id.toString(),
-      updateInput
+      user._id.toString(), // ← ownerId, no el input
+      updateInput,
     );
 
     expect(updatedPatient).toBeDefined();
     expect(updatedPatient?.name).toBe(updateInput.name);
-    expect(updatedPatient?.public).toBe(updateInput.public);
   });
 
   it("should throw error when updating non-existing patient", async () => {
+    const user = await User.create({
+      name: "User One",
+      email: "user1@test.com",
+    });
     const invalidId = new Types.ObjectId().toString();
+
     await expect(
-      PatientService.updatePatient(invalidId, { name: "New Name" })
+      PatientService.updatePatient(invalidId, user._id.toString(), {
+        name: "New Name",
+      }),
     ).rejects.toThrow("Patient not found");
   });
 
@@ -216,11 +226,14 @@ describe("PatientService", () => {
     });
 
     const deletedPatient = await PatientService.deletePatient(
-      patient._id.toString()
+      patient._id.toString(),
+      user._id.toString(),
     );
 
     expect(deletedPatient).toBeDefined();
-    expect(deletedPatient?._id.toString()).toBe(patient._id.toString());
+    expect(deletedPatient?.identifier.toString()).toBe(
+      patient.identifier.toString(),
+    );
 
     const fetchDeleted = await Patient.findById(patient._id);
     expect(fetchDeleted).toBeNull();

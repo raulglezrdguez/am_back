@@ -12,7 +12,6 @@ export type CreatePatientInput = {
   medicalHistory?: string;
   allergies?: string[];
   medications?: string[];
-  public?: boolean;
   owner: string; // User ID
 };
 
@@ -28,7 +27,6 @@ export type UpdatePatientInput = {
   medicalHistory?: string;
   allergies?: string[];
   medications?: string[];
-  public?: boolean;
 };
 
 export type PatientOutput = {
@@ -44,7 +42,6 @@ export type PatientOutput = {
   medicalHistory?: string;
   allergies: string[];
   medications: string[];
-  public: boolean;
   owner: {
     id: string;
     name: string;

@@ -7,19 +7,19 @@ import { type ApolloContext } from "../../config/apollo.context.ts";
 
 export default {
   Query: {
-    patients: (_: any, __: any, { currentUser }: ApolloContext) => {
+    patients: async (_: any, __: any, { currentUser }: ApolloContext) => {
       if (!currentUser) return [];
-      return patientService.listPatients(currentUser.id);
+      return (await patientService.listPatients(currentUser.id)).items;
     },
 
-    sharedPatients: (_: any, __: any, { currentUser }: ApolloContext) => {
+    sharedPatients: async (_: any, __: any, { currentUser }: ApolloContext) => {
       if (!currentUser) return [];
-      return patientService.listSharedPatients(currentUser.id);
+      return (await patientService.listSharedPatients(currentUser.id)).items;
     },
 
-    allPatients: (_: any, __: any, { currentUser }: ApolloContext) => {
+    allPatients: async (_: any, __: any, { currentUser }: ApolloContext) => {
       if (!currentUser) return [];
-      return patientService.listAllPatients(currentUser.id);
+      return (await patientService.listAllPatients(currentUser.id)).items;
     },
 
     patient: (

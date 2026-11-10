@@ -1,19 +1,15 @@
-import mongoose from "mongoose";
-import { MongoMemoryServer } from "mongodb-memory-server";
+import { closeTestDB, connectTestDB } from "./setup.ts";
+
 import User from "../../../models/user.model.ts";
 import * as userService from "../../../services/user.service.ts";
 import type { CreateUserInput } from "../../../types/user.d.ts";
 
-let mongoServer: MongoMemoryServer;
-
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  await mongoose.connect(mongoServer.getUri());
+  await connectTestDB();
 });
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  await closeTestDB();
 });
 
 afterEach(async () => {
@@ -70,7 +66,7 @@ describe("UserService", () => {
     });
     const updatedUser = await userService.updateUser(
       createdUser._id.toString(),
-      { name: "Bobby" }
+      { name: "Bobby" },
     );
     expect(updatedUser).not.toBeNull();
     expect(updatedUser?.name).toBe("Bobby");
@@ -96,7 +92,7 @@ describe("UserService", () => {
     });
     const updatedUser = await userService.updateUserRole(
       createdUser._id.toString(),
-      1
+      1,
     );
     expect(updatedUser).not.toBeNull();
     expect(updatedUser?.role).toBe(1);
@@ -111,7 +107,7 @@ describe("UserService", () => {
     });
     const updatedUser = await userService.updateUserStatus(
       createdUser._id.toString(),
-      1
+      1,
     );
     expect(updatedUser).not.toBeNull();
     expect(updatedUser?.status).toBe(1);

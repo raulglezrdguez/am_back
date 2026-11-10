@@ -1,28 +1,22 @@
-import mongoose, { Types } from "mongoose";
-import { MongoMemoryServer } from "mongodb-memory-server";
-
+import { Types } from "mongoose";
+import { closeTestDB, connectTestDB } from "./setup.ts";
 import Exam from "../../../models/exam.model.ts";
 import User from "../../../models/user.model.ts";
 import * as examService from "../../../services/exam.service.ts";
 import type {
   CreateExamInput,
-  AnswerOptionInput,
   ExpressionInput,
   QuestionInput,
   UpdateExamPropertiesInput,
 } from "../../../types/exam.d.ts";
 import { Answer, Operator } from "../../../types/exam_enums.ts";
 
-let mongoServer: MongoMemoryServer;
-
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  await mongoose.connect(mongoServer.getUri());
+  await connectTestDB();
 });
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  await closeTestDB();
 });
 
 afterEach(async () => {
@@ -81,8 +75,8 @@ describe("ExamServise", () => {
       questions: [],
     });
 
-    const exams = await examService.listExams();
-    expect(exams.length).toBe(1);
+    const page = await examService.listExams();
+    expect(page.items).toHaveLength(1);
   });
 
   it("should list exams by author", async () => {
@@ -134,8 +128,8 @@ describe("ExamServise", () => {
       questions: [],
     });
 
-    const exams = await examService.listExamsByAuthor(`${user._id}`);
-    expect(exams.length).toBe(2);
+    const page = await examService.listExamsByAuthor(`${user._id}`);
+    expect(page.items).toHaveLength(2);
   });
 
   it("should get exam by id if public or belongs to author", async () => {
@@ -197,39 +191,39 @@ describe("ExamServise", () => {
     // Accessing user's private exam
     const privateExamAsAuthor = await examService.getExamById(
       `${userExam1._id}`,
-      `${user._id}`
+      `${user._id}`,
     );
     expect(privateExamAsAuthor).not.toBeNull();
     expect(privateExamAsAuthor?.title).toBe("Private Exam");
     expect(privateExamAsAuthor?.author).toBeDefined();
     expect(privateExamAsAuthor?.author._id.toString()).toBe(
-      user._id.toString()
+      user._id.toString(),
     );
 
     // Accessing other user's private exam
     const otherUserPrivateExam = await examService.getExamById(
       `${userExam1._id}`,
-      `${otherUser._id}`
+      `${otherUser._id}`,
     );
     expect(otherUserPrivateExam).toBeNull();
 
     // Accessing other user's private exam
     const otherPrivateExam = await examService.getExamById(
       `${userExam1._id}`,
-      null
+      null,
     );
     expect(otherPrivateExam).toBeNull();
 
     // Accessing other user's public exam
     const otherPublicExam = await examService.getExamById(
       `${otherUserExam._id}`,
-      null
+      null,
     );
     expect(otherPublicExam).not.toBeNull();
     expect(otherPublicExam?.title).toBe("Other Public Exam");
     expect(otherPublicExam?.author).toBeDefined();
     expect(otherPublicExam?.author._id.toString()).toBe(
-      otherUser._id.toString()
+      otherUser._id.toString(),
     );
   });
 
@@ -299,7 +293,7 @@ describe("ExamServise", () => {
 
     const updatedExam = await examService.updateExamProperties(
       `${exam._id}`,
-      input
+      input,
     );
     expect(updatedExam).not.toBeNull();
     expect(updatedExam?.title).toBe("Updated Exam title");
@@ -338,7 +332,7 @@ describe("ExamServise", () => {
 
     const updatedExam = await examService.createExamExpression(
       `${exam._id}`,
-      input
+      input,
     );
     expect(updatedExam).not.toBeNull();
     expect(updatedExam?.expression.length).toBe(1);
@@ -389,7 +383,7 @@ describe("ExamServise", () => {
 
     const updatedExam = await examService.updateExamExpression(
       `${exam._id}`,
-      input
+      input,
     );
     expect(updatedExam).not.toBeNull();
     expect(updatedExam?.expression.length).toBe(1);
@@ -438,7 +432,7 @@ describe("ExamServise", () => {
     };
 
     await expect(
-      examService.updateExamExpression(`${exam._id}`, input)
+      examService.updateExamExpression(`${exam._id}`, input),
     ).rejects.toThrow("Expression not found in exam");
   });
 
@@ -455,7 +449,7 @@ describe("ExamServise", () => {
     const nonExistingExamId = new Types.ObjectId().toString();
 
     await expect(
-      examService.createExamExpression(nonExistingExamId, input)
+      examService.createExamExpression(nonExistingExamId, input),
     ).rejects.toThrow("Exam not found");
   });
 
@@ -470,7 +464,7 @@ describe("ExamServise", () => {
     const nonExistingExamId = new Types.ObjectId().toString();
 
     await expect(
-      examService.updateExamExpression(nonExistingExamId, input)
+      examService.updateExamExpression(nonExistingExamId, input),
     ).rejects.toThrow("Exam not found");
   });
 
@@ -479,7 +473,7 @@ describe("ExamServise", () => {
     const expressionId = "expr1";
 
     await expect(
-      examService.deleteExamExpression(nonExistingExamId, expressionId)
+      examService.deleteExamExpression(nonExistingExamId, expressionId),
     ).rejects.toThrow("Exam not found");
   });
 
@@ -512,7 +506,7 @@ describe("ExamServise", () => {
     });
 
     await expect(
-      examService.deleteExamExpression(`${exam._id}`, "nonExistingExpr")
+      examService.deleteExamExpression(`${exam._id}`, "nonExistingExpr"),
     ).rejects.toThrow("Expression not found in exam");
   });
 
@@ -571,7 +565,7 @@ describe("ExamServise", () => {
 
     const updatedExam = await examService.createExamQuestions(
       `${exam._id}`,
-      input
+      input,
     );
     expect(updatedExam).not.toBeNull();
     expect(updatedExam?.questions.length).toBe(2);
@@ -649,7 +643,7 @@ describe("ExamServise", () => {
 
     const updatedExam = await examService.updateExamQuestion(
       `${exam._id}`,
-      input
+      input,
     );
 
     expect(updatedExam).not.toBeNull();
@@ -726,7 +720,7 @@ describe("ExamServise", () => {
     };
 
     await expect(
-      examService.updateExamQuestion(`${exam._id}`, input)
+      examService.updateExamQuestion(`${exam._id}`, input),
     ).rejects.toThrow("Question not found in exam");
   });
 
@@ -751,7 +745,7 @@ describe("ExamServise", () => {
     const nonExistingExamId = new Types.ObjectId().toString();
 
     await expect(
-      examService.createExamQuestions(nonExistingExamId, input)
+      examService.createExamQuestions(nonExistingExamId, input),
     ).rejects.toThrow("Exam not found");
   });
 
@@ -774,7 +768,7 @@ describe("ExamServise", () => {
     const nonExistingExamId = new Types.ObjectId().toString();
 
     await expect(
-      examService.updateExamQuestion(nonExistingExamId, input)
+      examService.updateExamQuestion(nonExistingExamId, input),
     ).rejects.toThrow("Exam not found");
   });
 
@@ -783,7 +777,7 @@ describe("ExamServise", () => {
     const questionId = "quest1";
 
     await expect(
-      examService.deleteExamQuestion(nonExistingExamId, questionId)
+      examService.deleteExamQuestion(nonExistingExamId, questionId),
     ).rejects.toThrow("Exam not found");
   });
 
@@ -824,7 +818,7 @@ describe("ExamServise", () => {
     });
 
     await expect(
-      examService.deleteExamQuestion(`${exam._id}`, "nonExistingQuest")
+      examService.deleteExamQuestion(`${exam._id}`, "nonExistingQuest"),
     ).rejects.toThrow("Question not found in exam");
   });
 
@@ -862,7 +856,7 @@ describe("ExamServise", () => {
     const nonExistingExamId = new Types.ObjectId().toString();
 
     await expect(examService.deleteExam(nonExistingExamId)).rejects.toThrow(
-      "Exam not found"
+      "Exam not found",
     );
   });
 });

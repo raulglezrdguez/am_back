@@ -43,11 +43,11 @@ const populatePatientMin = {
 };
 const populateAuthorFull = {
   path: "author",
-  select: "name email role status createdAt updatedAt",
+  select: "id name email role status createdAt updatedAt",
 };
 
 const STAT_PROJECTION =
-  "exam patient author completedAt result address createdAt";
+  "exam patient author completedAt result answers address createdAt";
 
 export type StatListOptions = {
   actor: StatActor;
@@ -82,7 +82,7 @@ export const getStatsByPatient = async (
   id: string,
   actor: StatActor,
   options: StatListOptions = { actor },
-): Promise<CursorPage<unknown>> => {
+): Promise<CursorPage<Record<string, any>>> => {
   const limit = clampLimit(options.limit);
   const filter = {
     patient: id,
@@ -93,8 +93,8 @@ export const getStatsByPatient = async (
   const items = await Stat.find(filter)
     .select(STAT_PROJECTION)
     .populate(populateExamMinimal)
-    .populate("patient", "identifier name birthDate sex")
-    .populate("author", "name")
+    .populate(populatePatientMin)
+    .populate(populateAuthorFull)
     .sort({ completedAt: -1, _id: -1 })
     .limit(limit + 1) // +1 para saber si hay siguiente
     .lean();
@@ -108,7 +108,7 @@ export const getStatsByExam = async (
   id: string,
   actor: StatActor,
   options: StatListOptions = { actor },
-): Promise<CursorPage<unknown>> => {
+): Promise<CursorPage<Record<string, any>>> => {
   const limit = clampLimit(options.limit);
   const filter = {
     exam: id,
@@ -119,8 +119,8 @@ export const getStatsByExam = async (
   const items = await Stat.find(filter)
     .select(STAT_PROJECTION)
     .populate(populateExamMinimal)
-    .populate("patient", "identifier name")
-    .populate("author", "name")
+    .populate(populatePatientMin)
+    .populate(populateAuthorFull)
     .sort({ completedAt: -1, _id: -1 })
     .limit(limit + 1)
     .lean();
@@ -134,7 +134,7 @@ export const getStatsByExam = async (
 export const getStats = async (
   filter: StatFilterInput,
   options: StatListOptions,
-): Promise<CursorPage<unknown>> => {
+): Promise<CursorPage<Record<string, any>>> => {
   const { actor } = options;
   const limit = clampLimit(options.limit);
   const mongoFilter: Record<string, any> = { ...buildAuthorScope(actor) };
@@ -156,7 +156,7 @@ export const getStats = async (
   const items = await Stat.find(mongoFilter)
     .select(STAT_PROJECTION)
     .populate(populateExamMinimal)
-    .populate("author", "name")
+    .populate(populateAuthorFull)
     .sort({ completedAt: -1, _id: -1 })
     .limit(limit + 1)
     .lean();
@@ -175,8 +175,7 @@ export const createStat = async (input: CreateStatInput, actor: StatActor) => {
 
   const session = await mongoose.startSession();
   try {
-    let created;
-    await session.withTransaction(async () => {
+    const created = await session.withTransaction(async () => {
       // Validaciones dentro de la transacción (lectura consistente)
       // El paciente debe pertenecer al actor (o ser compartido con él)
       // Admin: puede usar cualquiera.
@@ -225,7 +224,7 @@ export const createStat = async (input: CreateStatInput, actor: StatActor) => {
       );
 
       // Releer populado dentro de la transacción
-      created = await Stat.findOne({ _id: doc._id, ...buildAuthorScope(actor) })
+      return await Stat.findOne({ _id: doc._id, ...buildAuthorScope(actor) })
         .session(session)
         .populate(populateExamFull)
         .populate(populatePatientMin)

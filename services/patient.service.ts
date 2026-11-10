@@ -17,26 +17,29 @@ import {
   type CursorPage,
 } from "./utils.ts";
 
-const PATIENT_SELECT =
-  "_id identifier name birthDate sex address phone email emergencyContact medicalHistory allergies medications owner sharedWith";
+const USER_POPULATE = "id name email role status createdAt updatedAt";
 const PATIENT_POPULATES = [
-  { path: "owner", select: "name email role status createdAt updatedAt" },
+  { path: "owner", select: USER_POPULATE },
   { path: "sharedWith", select: "name email role status createdAt updatedAt" },
 ];
 const NOT_DELETED = { deletedAt: null };
+const PATIENT_SELECT =
+  "_id identifier name birthDate sex address phone email emergencyContact medicalHistory allergies medications public owner sharedWith createdAt";
+
+const OWNER_POPULATE = { path: "owner", select: USER_POPULATE };
+const SHARED_POPULATE = { path: "sharedWith", select: USER_POPULATE };
 
 const patientPage = (rows: any[], limit: number): CursorPage<any> => {
   const hasMore = rows.length > limit;
   const items = hasMore ? rows.slice(0, limit) : rows;
+  const last = items[items.length - 1];
   return {
     items,
     hasMore,
-    nextCursor: hasMore
-      ? encodeCursor(
-          items[items.length - 1].createdAt,
-          String(items[items.length - 1]._id),
-        )
-      : null,
+    nextCursor:
+      hasMore && last?.createdAt
+        ? encodeCursor(last.createdAt, String(last._id))
+        : null,
   };
 };
 
@@ -53,8 +56,8 @@ export const listPatients = async (
     ...buildCursorFilter("createdAt", cursor),
   })
     .select(PATIENT_SELECT)
-    .populate("owner", "name")
-    .populate("sharedWith", "name")
+    .populate(OWNER_POPULATE)
+    .populate(SHARED_POPULATE)
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit + 1)
     .lean();
@@ -76,8 +79,8 @@ export const listSharedPatients = async (
     ],
   })
     .select(PATIENT_SELECT)
-    .populate("owner", "name")
-    .populate("sharedWith", "name")
+    .populate(OWNER_POPULATE)
+    .populate(SHARED_POPULATE)
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit + 1)
     .lean();
@@ -99,8 +102,8 @@ export const listAllPatients = async (
     ],
   })
     .select(PATIENT_SELECT)
-    .populate("owner", "name")
-    .populate("sharedWith", "name")
+    .populate(OWNER_POPULATE)
+    .populate(SHARED_POPULATE)
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit + 1)
     .lean();
@@ -111,16 +114,16 @@ export const listAllPatients = async (
 export const getPatient = async (id: string, userId: string) =>
   await Patient.findOne({ ...NOT_DELETED, _id: id, owner: userId })
     .select(PATIENT_SELECT)
-    .populate("owner", "name")
-    .populate("sharedWith", "name")
+    .populate(OWNER_POPULATE)
+    .populate(SHARED_POPULATE)
     .lean();
 
 // Get patient by ID only if it is shared with the user
 export const getSharedPatient = async (id: string, userId: string) =>
   await Patient.findOne({ ...NOT_DELETED, _id: id, sharedWith: userId })
     .select(PATIENT_SELECT)
-    .populate("owner", "name")
-    .populate("sharedWith", "name")
+    .populate(OWNER_POPULATE)
+    .populate(SHARED_POPULATE)
     .lean();
 
 // Get patient by ID only if it belongs to the owner or is shared with the user
@@ -131,8 +134,8 @@ export const getAllPatient = async (id: string, userId: string) =>
     $or: [{ owner: userId }, { sharedWith: userId }],
   })
     .select(PATIENT_SELECT)
-    .populate("owner", "name")
-    .populate("sharedWith", "name")
+    .populate(OWNER_POPULATE)
+    .populate(SHARED_POPULATE)
     .lean();
 
 // get patient by identifier or name
@@ -165,8 +168,8 @@ export const getPatientBy = async (
 
   return await Patient.find(filter)
     .select(PATIENT_SELECT)
-    .populate("owner", "name")
-    .populate("sharedWith", "name")
+    .populate(OWNER_POPULATE)
+    .populate(SHARED_POPULATE)
     .lean();
 };
 
@@ -200,8 +203,8 @@ export const getSharedPatientBy = async (
 
   return await Patient.find(filter)
     .select(PATIENT_SELECT)
-    .populate("owner", "name")
-    .populate("sharedWith", "name")
+    .populate(OWNER_POPULATE)
+    .populate(SHARED_POPULATE)
     .lean();
 };
 
@@ -235,8 +238,8 @@ export const getAllPatientBy = async (
 
   return await Patient.find(filter)
     .select(PATIENT_SELECT)
-    .populate("owner", "name")
-    .populate("sharedWith", "name")
+    .populate(OWNER_POPULATE)
+    .populate(SHARED_POPULATE)
     .lean();
 };
 
@@ -248,8 +251,8 @@ export const createPatient = async (
 
   return await Patient.findById(patient._id)
     .select(PATIENT_SELECT)
-    .populate("owner", "name")
-    .populate("sharedWith", "name")
+    .populate(OWNER_POPULATE)
+    .populate(SHARED_POPULATE)
     .lean();
 };
 
@@ -300,16 +303,15 @@ export const deletePatient = async (id: string, ownerId: string) => {
     owner: ownerId,
   })
     .select(PATIENT_SELECT)
-    .populate("owner", "name")
-    .populate("sharedWith", "name")
+    .populate(OWNER_POPULATE)
+    .populate(SHARED_POPULATE)
     .lean();
 
   if (!patient) throw new Error("Patient not found or not owned by you");
 
   const session = await mongoose.startSession();
   try {
-    let deleted;
-    await session.withTransaction(async () => {
+    const deleted = await session.withTransaction(async () => {
       const statsCount = await Stat.countDocuments({ patient: id }).session(
         session,
       );
@@ -323,11 +325,11 @@ export const deletePatient = async (id: string, ownerId: string) => {
         owner: ownerId,
       })
         .session(session)
-        .populate("owner", "name")
-        .populate("sharedWith", "name")
+        .populate(OWNER_POPULATE)
+        .populate(SHARED_POPULATE)
         .lean();
       if (!patient) throw new Error("Patient not found or not owned by you");
-      deleted = patient;
+      return patient;
     });
     return deleted;
   } finally {
@@ -361,8 +363,8 @@ export const sharePatient = async (
     UPDATE_OPTS,
   )
     .select(PATIENT_SELECT)
-    .populate("owner", "name")
-    .populate("sharedWith", "name");
+    .populate(OWNER_POPULATE)
+    .populate(SHARED_POPULATE);
 
   return updated;
 };
@@ -386,6 +388,6 @@ export const deleteSharedPatient = async (
     UPDATE_OPTS, // ← aunque sharedWith es ObjectId[], runValidators protege el cast
   )
     .select(PATIENT_SELECT)
-    .populate("owner", "name")
-    .populate("sharedWith", "name");
+    .populate(OWNER_POPULATE)
+    .populate(SHARED_POPULATE);
 };

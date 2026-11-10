@@ -5,7 +5,7 @@ import type { CreateStatInput, StatFilterInput } from "../../types/stat.d.ts";
 import { type ApolloContext } from "../../config/apollo.context.ts";
 import { NotFoundError } from "../../services/stat.policy.ts";
 
-const toActor = (currentUser: ApolloContext["currentUser"]) => {
+export const toActor = (currentUser: ApolloContext["currentUser"]) => {
   if (!currentUser) {
     // Usa GraphQLError con extensions.code
     throw new GraphQLError("Authentication required", {
@@ -42,7 +42,12 @@ export default {
         _: any,
         { id }: { id: string },
         { currentUser }: ApolloContext,
-      ) => wrap(() => statService.getStatsByPatient(id, toActor(currentUser))),
+      ) =>
+        wrap(
+          async () =>
+            (await statService.getStatsByPatient(id, toActor(currentUser)))
+              .items,
+        ),
       extensions: { complexity: 5 },
     },
 
@@ -51,7 +56,11 @@ export default {
         _: any,
         { id }: { id: string },
         { currentUser }: ApolloContext,
-      ) => wrap(() => statService.getStatsByExam(id, toActor(currentUser))),
+      ) =>
+        wrap(
+          async () =>
+            (await statService.getStatsByExam(id, toActor(currentUser))).items,
+        ),
       extensions: { complexity: 5 },
     },
 
@@ -61,12 +70,14 @@ export default {
         { filter }: { filter: StatFilterInput },
         { currentUser }: ApolloContext,
       ) =>
-        wrap(() =>
-          statService.getStats(filter || {}, {
-            actor: toActor(currentUser),
-            limit: 50,
-            skip: 0,
-          }),
+        wrap(
+          async () =>
+            (
+              await statService.getStats(filter || {}, {
+                actor: toActor(currentUser),
+                limit: 50,
+              })
+            ).items,
         ),
       extensions: { complexity: 5 },
     },

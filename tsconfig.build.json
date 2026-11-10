@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": ".",
+    "sourceMap": true,
+    "declaration": false,
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": [
+    "index.ts",
+    "api/**/*.ts",
+    "config/**/*.ts",
+    "graphql/**/*.ts",
+    "middlewares/**/*.ts",
+    "models/**/*.ts",
+    "services/**/*.ts",
+    "types/**/*.ts",
+    "types/**/*.d.ts"
+  ],
+  "exclude": ["node_modules", "dist", "tests"]
+}

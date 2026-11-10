@@ -3,6 +3,15 @@ import * as userService from "../../services/user.service.ts";
 import type { CreateUserInput, UpdateUserInput } from "../../types/user.d.ts";
 
 export default {
+  User: {
+    id: (parent: any) => {
+      const v = parent?.id ?? parent?._id;
+      if (v === undefined || v === null) {
+        throw new Error("User.id: parent has neither id nor _id");
+      }
+      return String(v);
+    },
+  },
   Query: {
     users: (_: any, __: any, { currentUser }: ApolloContext) => {
       if (!currentUser) throw new Error("Authentication required");
