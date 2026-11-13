@@ -1,13 +1,25 @@
-import { logger } from "./logger.ts";
+import { sanitizeError } from "./logger.ts";
 
-export function errorHandler(err: any, _req: any, res: any, _next: any) {
-  logger.error(err);
+export function errorHandler(err: any, req: any, res: any, next: any) {
+  if (res.headersSent) return next(err);
 
-  // Errores conocidos (lanzados por nosotros)
-  if (err.isOperational) {
-    return res.status(err.statusCode).send({ error: err.message });
-  }
+  const statusCode = Number(err?.statusCode) || 500;
+  const safeMessage = err?.isOperational
+    ? String(err.message).slice(0, 300)
+    : "Internal server error";
 
-  // Cualquier otro error
-  return res.status(500).send({ error: "Internal server error" });
+  req.log?.error(
+    {
+      err: sanitizeError(err),
+      statusCode,
+      requestId: req.id,
+      userId: req.user?.id ?? null,
+    },
+    "request_failed",
+  );
+
+  return res.status(statusCode).send({
+    error: safeMessage,
+    requestId: req.id,
+  });
 }

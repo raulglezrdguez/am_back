@@ -6,13 +6,27 @@ import User from "../models/user.model.ts";
 import adminFirebase from "../config/admin.firebase.ts";
 import type { DecodedIdToken } from "firebase-admin/auth";
 
-const audit = (event: string, data: Record<string, unknown>) => {
-  console.info(
-    JSON.stringify({
-      timestamp: new Date().toISOString(),
-      event,
-      ...data,
-    }),
+import { logger, sanitizeError } from "./logger.ts";
+import {
+  writeAuditEvent,
+  type AuditContext,
+} from "../services/audit.service.ts";
+
+const auditContext = (req: Request): AuditContext => ({
+  requestId: req.id,
+  userId: req.user?.id ?? null,
+  userRole: req.user?.role ?? null,
+  ip: req.ip ?? null,
+  userAgent: req.headers["user-agent"]?.slice(0, 256) ?? null,
+});
+
+const auditAuth = (
+  req: Request,
+  event: Parameters<typeof writeAuditEvent>[0],
+) => {
+  // Auth no debe bloquearse si la auditoría falla; se alerta por métrica/log.
+  void writeAuditEvent(event, auditContext(req), { failClosed: false }).catch(
+    () => undefined,
   );
 };
 
@@ -44,12 +58,14 @@ const verifyLocalUser = async (token: string, req: any) => {
       req.user = null;
     }
   } catch (error: any) {
+    logger.debug({ err: sanitizeError(error) }, "jwt_verification_failed");
     req.user = null;
   }
 };
 
 const verifyFirebaseToken = async (
   token: string,
+  req: any,
 ): Promise<DecodedIdToken | null> => {
   try {
     // checkRevoked = true: rechaza tokens de usuarios deshabilitados o sesiones revocadas
@@ -57,7 +73,15 @@ const verifyFirebaseToken = async (
   } catch (idTokenError: any) {
     // Si el token fue revocado explícitamente, no intentes session cookie
     if (idTokenError?.code === "auth/id-token-revoked") {
-      audit("auth.firebase.token_revoked", { tokenType: "id_token" });
+      // Token revocado
+      auditAuth(req, {
+        operation: "auth.token",
+        operationType: "system",
+        resourceType: "Auth",
+        result: "denied",
+        reason: "TOKEN_REVOKED",
+        metadata: { method: "firebase", tokenType: "id_token" },
+      });
       return null;
     }
     try {
@@ -65,12 +89,24 @@ const verifyFirebaseToken = async (
       return await adminFirebase.auth().verifySessionCookie(token, true);
     } catch (sessionError: any) {
       if (sessionError?.code === "auth/session-cookie-revoked") {
-        audit("auth.firebase.session_cookie_revoked", {
-          tokenType: "id_token",
+        // Session cookie revocada
+        auditAuth(req, {
+          operation: "auth.token",
+          operationType: "system",
+          resourceType: "Auth",
+          result: "denied",
+          reason: "SESSION_COOKIE_REVOKED",
+          metadata: { method: "firebase", tokenType: "session_cookie" },
         });
       } else {
-        audit("auth.firebase.session.invalid_token", {
-          error: sessionError?.code,
+        // Token inválido
+        auditAuth(req, {
+          operation: "auth.token",
+          operationType: "system",
+          resourceType: "Auth",
+          result: "denied",
+          reason: "INVALID_TOKEN",
+          metadata: { method: "firebase" },
         });
       }
       return null;
@@ -108,12 +144,20 @@ export async function authMiddleware(
     }
 
     // Verificar token de Firebase si es un token de Firebase
-    const firebaseUser = await verifyFirebaseToken(token);
+    const firebaseUser = await verifyFirebaseToken(token, req);
 
     if (firebaseUser) {
       // bloquear cualquier operación con email no verificado
       if (!firebaseUser.email_verified) {
-        audit("auth.firebase.unverified_email", { email: firebaseUser.email });
+        // Email no verificado: NO loguear el email
+        auditAuth(req, {
+          operation: "auth.email",
+          operationType: "system",
+          resourceType: "Auth",
+          result: "denied",
+          reason: "EMAIL_UNVERIFIED",
+          metadata: { method: "firebase", emailVerified: false },
+        });
         req.user = null;
         return next();
       }
@@ -129,6 +173,17 @@ export async function authMiddleware(
             status: dbUser.status,
           };
         } else {
+          // Usuario inactivo
+          auditAuth(req, {
+            operation: "auth.user",
+            operationType: "system",
+            resourceType: "User",
+            resourceId: dbUser._id.toString(),
+            result: "denied",
+            reason: "USER_INACTIVE",
+            metadata: { method: "firebase" },
+          });
+
           req.user = null;
         }
       } else if (firebaseUser.name && firebaseUser.email) {
@@ -139,16 +194,56 @@ export async function authMiddleware(
           status: 0, // ⚠️ inactivo hasta aprobación manual
         });
 
+        // Usuario provisionado automáticamente
+        auditAuth(req, {
+          operation: "auth.user.provision",
+          operationType: "system",
+          resourceType: "User",
+          resourceId: newDbUser._id.toString(),
+          result: "success",
+          metadata: { method: "firebase", provisioned: true },
+        });
+
         req.user = null;
       } else {
+        // JWT inválido / usuario no encontrado
+        auditAuth(req, {
+          operation: "auth.jwt",
+          operationType: "system",
+          resourceType: "Auth",
+          result: "denied",
+          reason: "JWT_INVALID",
+          metadata: { method: "jwt" },
+        });
+
         req.user = null;
       }
     } else {
+      // JWT inválido / usuario no encontrado
+      auditAuth(req, {
+        operation: "auth.jwt",
+        operationType: "system",
+        resourceType: "Auth",
+        result: "denied",
+        reason: "JWT_INVALID",
+        metadata: { method: "jwt" },
+      });
+
       req.user = null;
     }
 
     next();
   } catch (err) {
+    // JWT inválido / usuario no encontrado
+    auditAuth(req, {
+      operation: "auth.jwt",
+      operationType: "system",
+      resourceType: "Auth",
+      result: "denied",
+      reason: "JWT_INVALID",
+      metadata: { method: "jwt" },
+    });
+
     req.user = null; // token inválido → anónimo
     next();
   }

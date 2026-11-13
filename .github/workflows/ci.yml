@@ -8,23 +8,58 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+
+    env:
+      NODE_ENV: test
+      MONGO_URI: mongodb://127.0.0.1:27017/am_test?replicaSet=rs0&directConnection=true
+      MONGO_TEST_URI: mongodb://127.0.0.1:27017/am_test?replicaSet=rs0&directConnection=true
+      REDIS_URL: redis://127.0.0.1:6379
+      JWT_SECRET: test-secret-with-at-least-32-characters
+      FIREBASE_SERVICE_ACCOUNT: test
+      OTEL_ENABLED: "false"
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Start MongoDB replica set
+        run: |
+          docker run -d --name mongo-rs -p 27017:27017 mongo:7 --replSet rs0 --bind_ip_all
+          for i in $(seq 1 30); do
+            if docker exec mongo-rs mongosh --quiet --eval 'db.runCommand({ping:1}).ok' >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          docker exec mongo-rs mongosh --quiet --eval \
+            'rs.initiate({_id:"rs0",members:[{_id:0,host:"127.0.0.1:27017"}]})'
 
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
 
-      - name: Install
-        run: npm ci
+      - run: npm ci
 
-      - name: Typecheck
+      - name: Typecheck (prod)
         run: npm run typecheck
+
+      - name: Typecheck (tests)
+        run: npm run typecheck:tests
 
       - name: Build
         run: npm run build
 
-      # Activar cuando la suite esté en verde (Fase 5)
-      # - name: Test
-      #   run: npm test
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Integration tests
+        run: npm run test:int
+
+      - name: Docker build
+        run: docker build -t am-back:ci .

@@ -14,6 +14,7 @@ import { typeDefs } from "../graphql/types/index.ts";
 import { resolvers } from "../graphql/resolvers/index.ts";
 import { type ApolloContext } from "./apollo.context.ts";
 import { IS_PRODUCTION } from "./index.ts";
+import { observabilityPlugin } from "../graphql/plugins/observability.plugin.ts";
 
 const MAX_DEPTH = 8; // recomendado 7-10
 const MAX_COMPLEXITY = 1000; // puntos de costo por query
@@ -24,6 +25,9 @@ export function createApolloServer(httpServer: any) {
     resolvers,
     // Desactiva introspección en producción
     introspection: !IS_PRODUCTION,
+    // Nosotros dirigimos el ciclo de vida. Sin esto, Apollo instala SIGTERM/SIGINT
+    // y re-lanza la señal, saltándose el cierre de Mongoose/Redis.
+    stopOnTerminationSignals: false,
 
     // Capa 1: limitación de profundidad (se ejecuta en fase de validación, costo mínimo)
     validationRules: [depthLimit(MAX_DEPTH)],
@@ -40,9 +44,15 @@ export function createApolloServer(httpServer: any) {
       //   : ApolloServerPluginLandingPageLocalDefault({ embed: true }),
       // Capa 2: análisis de complejidad (se ejecuta después de la validación, antes de la resolución)
       {
-        async requestDidStart() {
+        async requestDidStart({ contextValue }) {
           return {
-            async didResolveOperation({ request, document, schema }) {
+            async didResolveOperation({
+              request,
+              document,
+              schema,
+              operation,
+              operationName,
+            }) {
               const complexity = getComplexity({
                 schema,
                 operationName: request.operationName,
@@ -71,24 +81,50 @@ export function createApolloServer(httpServer: any) {
 
               // Opcional: registrar queries con alta complejidad para observabilidad
               if (complexity > MAX_COMPLEXITY * 0.7) {
-                console.warn(
-                  `[graphql] high complexity query: ${complexity} (user: ${
-                    request.http?.headers?.get("authorization")
-                      ? "auth"
-                      : "anon"
-                  })`,
+                contextValue.logger.warn(
+                  {
+                    requestId: contextValue.requestId,
+                    userId: contextValue.currentUser?.id ?? null,
+                    operation: operationName ?? "anonymous",
+                    operationType: operation?.operation ?? "query",
+                    complexity,
+                    maxComplexity: MAX_COMPLEXITY,
+                  },
+                  "graphql_high_complexity",
                 );
               }
             },
           };
         },
       },
+      observabilityPlugin,
     ],
-    formatError: (err) => {
-      if (IS_PRODUCTION) {
-        delete err.extensions?.stacktrace;
-      }
-      return err;
+    formatError: (formattedError) => {
+      const code = String(
+        formattedError.extensions?.code ?? "INTERNAL_SERVER_ERROR",
+      );
+
+      if (!IS_PRODUCTION) return formattedError;
+
+      const safeMessages: Record<string, string> = {
+        UNAUTHENTICATED: "Authentication required",
+        NOT_FOUND: "Resource not found",
+        BAD_USER_INPUT: "Invalid input",
+        GRAPHQL_VALIDATION_FAILED: "Invalid query",
+        COMPLEXITY_LIMIT_EXCEEDED: "Query too complex",
+        RATE_LIMITED: "Too many requests",
+        SERVICE_UNAVAILABLE: "Service temporarily unavailable",
+      };
+
+      return {
+        message: safeMessages[code] ?? "Internal server error",
+        locations: formattedError.locations,
+        path: formattedError.path,
+        extensions: {
+          code,
+          requestId: formattedError.extensions?.requestId,
+        },
+      };
     },
   });
 }

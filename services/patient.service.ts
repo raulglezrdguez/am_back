@@ -16,6 +16,8 @@ import {
   encodeCursor,
   type CursorPage,
 } from "./utils.ts";
+import { phiSearchTruncatedTotal } from "../config/metrics.ts";
+import { logger } from "../middlewares/logger.ts";
 
 const USER_POPULATE = "id name email role status createdAt updatedAt";
 const PATIENT_POPULATES = [
@@ -28,6 +30,12 @@ const PATIENT_SELECT =
 
 const OWNER_POPULATE = { path: "owner", select: USER_POPULATE };
 const SHARED_POPULATE = { path: "sharedWith", select: USER_POPULATE };
+export const PATIENT_SEARCH_MAX = 50;
+
+type PatientSearchResult = {
+  items: any[];
+  truncated: boolean;
+};
 
 const patientPage = (rows: any[], limit: number): CursorPage<any> => {
   const hasMore = rows.length > limit;
@@ -138,12 +146,39 @@ export const getAllPatient = async (id: string, userId: string) =>
     .populate(SHARED_POPULATE)
     .lean();
 
-// get patient by identifier or name
-export const getPatientBy = async (
+const runPatientSearch = async (
+  filter: Record<string, unknown>,
+  operation: string,
+): Promise<PatientSearchResult> => {
+  const rows = await Patient.find(filter)
+    .select(PATIENT_SELECT)
+    .populate(OWNER_POPULATE)
+    .populate(SHARED_POPULATE)
+    .sort({ _id: 1 })
+    .limit(PATIENT_SEARCH_MAX + 1)
+    .lean();
+
+  const truncated = rows.length > PATIENT_SEARCH_MAX;
+
+  if (truncated) {
+    phiSearchTruncatedTotal.inc({ operation });
+    logger.warn({ operation, max: PATIENT_SEARCH_MAX }, "phi_search_truncated");
+  }
+
+  return {
+    items: truncated ? rows.slice(0, PATIENT_SEARCH_MAX) : rows,
+    truncated,
+  };
+};
+
+type Scope = "owner" | "sharedWith" | "both";
+
+const buildPatientSearchFilter = (
+  scope: Scope,
   identifier: string,
   name: string,
   userId: string,
-) => {
+): Record<string, unknown> => {
   const conditions: Record<string, unknown>[] = [];
 
   if (identifier) {
@@ -151,97 +186,60 @@ export const getPatientBy = async (
       identifier: { $regex: escapeRegex(identifier), $options: "i" },
     });
   }
-
   if (name) {
     conditions.push({
       name: { $regex: escapeRegex(name), $options: "i" },
     });
   }
 
-  const filter: Record<string, unknown> = {
+  const scopeFilter =
+    scope === "owner"
+      ? { owner: userId }
+      : scope === "sharedWith"
+        ? { sharedWith: userId }
+        : { $or: [{ owner: userId }, { sharedWith: userId }] };
+
+  return {
     ...NOT_DELETED,
     $and: [
-      { owner: userId },
+      scopeFilter,
       ...(conditions.length > 0 ? [{ $or: conditions }] : []),
     ],
   };
-
-  return await Patient.find(filter)
-    .select(PATIENT_SELECT)
-    .populate(OWNER_POPULATE)
-    .populate(SHARED_POPULATE)
-    .lean();
 };
+
+// get patient by identifier or name
+export const getPatientBy = (
+  identifier: string,
+  name: string,
+  userId: string,
+) =>
+  runPatientSearch(
+    buildPatientSearchFilter("owner", identifier, name, userId),
+    "patientBy",
+  );
 
 // get shared patient by identifier or name
-export const getSharedPatientBy = async (
+export const getSharedPatientBy = (
   identifier: string,
   name: string,
   userId: string,
-) => {
-  const conditions: Record<string, unknown>[] = [];
-
-  if (identifier) {
-    conditions.push({
-      identifier: { $regex: escapeRegex(identifier), $options: "i" },
-    });
-  }
-
-  if (name) {
-    conditions.push({
-      name: { $regex: escapeRegex(name), $options: "i" },
-    });
-  }
-
-  const filter: Record<string, unknown> = {
-    ...NOT_DELETED,
-    $and: [
-      { sharedWith: userId },
-      ...(conditions.length > 0 ? [{ $or: conditions }] : []),
-    ],
-  };
-
-  return await Patient.find(filter)
-    .select(PATIENT_SELECT)
-    .populate(OWNER_POPULATE)
-    .populate(SHARED_POPULATE)
-    .lean();
-};
+) =>
+  runPatientSearch(
+    buildPatientSearchFilter("sharedWith", identifier, name, userId),
+    "sharedPatientBy",
+  );
 
 // get all my patients by identifier or name
-export const getAllPatientBy = async (
+export const getAllPatientBy = (
   identifier: string,
   name: string,
   userId: string,
-) => {
-  const conditions: Record<string, unknown>[] = [];
-
-  if (identifier) {
-    conditions.push({
-      identifier: { $regex: escapeRegex(identifier), $options: "i" },
-    });
-  }
-
-  if (name) {
-    conditions.push({
-      name: { $regex: escapeRegex(name), $options: "i" },
-    });
-  }
-
-  const filter: Record<string, unknown> = {
-    ...NOT_DELETED,
-    $and: [
-      { $or: [{ owner: userId }, { sharedWith: userId }] },
-      ...(conditions.length > 0 ? [{ $or: conditions }] : []),
-    ],
-  };
-
-  return await Patient.find(filter)
-    .select(PATIENT_SELECT)
-    .populate(OWNER_POPULATE)
-    .populate(SHARED_POPULATE)
-    .lean();
-};
+) =>
+  runPatientSearch(
+    buildPatientSearchFilter("both", identifier, name, userId),
+    "allPatientBy",
+  );
 
 // Create a new patient
 export const createPatient = async (

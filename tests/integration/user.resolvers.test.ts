@@ -7,14 +7,16 @@ import { JWT_SECRET } from "../../config/index.ts";
 import { closeTestDB, connectTestDB } from "./setup.ts";
 
 let httpServer: import("http").Server;
+let apolloServer: import("@apollo/server").ApolloServer<any>;
 beforeAll(async () => {
   await connectTestDB();
-  ({ httpServer } = await createServer());
+  ({ httpServer, apolloServer } = await createServer());
 });
 
 afterAll(async () => {
   (global as any).__TEST_TEAR_DOWN__ = true;
 
+  await apolloServer.stop();
   await closeTestDB();
 
   await new Promise((resolve) => httpServer.close(resolve));

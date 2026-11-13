@@ -11,9 +11,10 @@
   "packageManager": "npm@11.19.1",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "start": "node --enable-source-maps dist/index.js",
+    "start": "node --enable-source-maps --import ./dist/instrumentation.js dist/index.js",
     "dev": "tsx watch index.ts",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "typecheck:tests": "tsc -p tsconfig.json --noEmit",
     "test:unit": "NODE_OPTIONS=\"--experimental-vm-modules\" jest tests/unit --runInBand --detectOpenHandles",
     "test:int": "NODE_OPTIONS=\"--experimental-vm-modules\" jest tests/integration --runInBand --detectOpenHandles --forceExit",
     "test": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --runInBand --coverage --detectOpenHandles --forceExit"
@@ -24,6 +25,14 @@
   "dependencies": {
     "@apollo/server": "^5.0.0",
     "@as-integrations/express5": "^1.1.2",
+    "@graphql-tools/merge": "^9.1.1",
+    "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/auto-instrumentations-node": "0.83.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.301.1",
+    "@opentelemetry/resources": "3.1.1",
+    "@opentelemetry/sdk-node": "0.301.1",
+    "@opentelemetry/semantic-conventions": "1.45.0",
+    "@sentry/node": "11.12.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
@@ -36,6 +45,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.19.1",
     "pino": "^10.1.0",
+    "prom-client": "15.1.3",
     "rate-limit-redis": "^6.0.2",
     "redis": "^6.3.1",
     "zod": "^4.6.7"

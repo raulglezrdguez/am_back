@@ -135,16 +135,18 @@ describe("PatientService", () => {
       "",
       user1._id.toString(),
     );
-    expect(byIdentifier).toHaveLength(1);
-    expect(byIdentifier[0].identifier).toBe("P001");
+    expect(byIdentifier.truncated).toBe(false);
+    expect(byIdentifier.items).toHaveLength(1);
+    expect(byIdentifier.items[0].identifier).toBe("P001");
 
     const byName = await PatientService.getPatientBy(
       "",
       "John",
       user1._id.toString(),
     );
-    expect(byName).toHaveLength(1); // P003 pertenece a user2: ya no se devuelve
-    expect(byName[0].identifier).toBe("P001");
+    expect(byName.truncated).toBe(false);
+    expect(byName.items).toHaveLength(1);
+    expect(byName.items[0].identifier).toBe("P001");
   });
 
   it("should create a new patient", async () => {
