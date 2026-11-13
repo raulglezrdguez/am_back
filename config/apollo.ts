@@ -28,6 +28,8 @@ export function createApolloServer(httpServer: any) {
     // Nosotros dirigimos el ciclo de vida. Sin esto, Apollo instala SIGTERM/SIGINT
     // y re-lanza la señal, saltándose el cierre de Mongoose/Redis.
     stopOnTerminationSignals: false,
+    // Nunca devolver stack traces al cliente, tampoco en staging/desarrollo.
+    includeStacktraceInErrorResponses: false,
 
     // Capa 1: limitación de profundidad (se ejecuta en fase de validación, costo mínimo)
     validationRules: [depthLimit(MAX_DEPTH)],
@@ -108,8 +110,12 @@ export function createApolloServer(httpServer: any) {
 
       const safeMessages: Record<string, string> = {
         UNAUTHENTICATED: "Authentication required",
+        FORBIDDEN: "Not allowed",
         NOT_FOUND: "Resource not found",
         BAD_USER_INPUT: "Invalid input",
+        CONFLICT: "Conflict",
+        TOO_MANY_REQUESTS: "Too many requests",
+        UNPROCESSABLE_ENTITY: "Invalid input",
         GRAPHQL_VALIDATION_FAILED: "Invalid query",
         COMPLEXITY_LIMIT_EXCEEDED: "Query too complex",
         RATE_LIMITED: "Too many requests",

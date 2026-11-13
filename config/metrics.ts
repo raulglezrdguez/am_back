@@ -7,8 +7,9 @@ import {
 } from "prom-client";
 import { createServer, type Server } from "node:http";
 import { performance } from "node:perf_hooks";
+import { timingSafeEqual } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
-import { logger } from "../middlewares/logger.ts";
+import { logger, sanitizeError } from "../middlewares/logger.ts";
 
 export const registry = new Registry();
 
@@ -120,8 +121,11 @@ export function metricsMiddleware(
   next: NextFunction,
 ) {
   const startedAt = performance.now();
+  let recorded = false;
 
-  res.on("finish", () => {
+  const record = () => {
+    if (recorded) return;
+    recorded = true;
     const labels = {
       method: req.method,
       route: normalizeRoute(req),
@@ -130,7 +134,10 @@ export function metricsMiddleware(
 
     httpRequestsTotal.inc(labels);
     httpRequestDuration.observe(labels, (performance.now() - startedAt) / 1000);
-  });
+  };
+
+  res.on("finish", record);
+  res.on("close", record);
 
   next();
 }
@@ -141,7 +148,12 @@ export async function startMetricsServer(): Promise<void> {
   if (process.env.NODE_ENV === "test") return;
 
   const port = Number(process.env.METRICS_PORT ?? 9464);
+  const host = process.env.METRICS_HOST ?? "127.0.0.1";
+  const token = process.env.METRICS_TOKEN;
 
+  if (host !== "127.0.0.1" && !token) {
+    logger.warn({ host, port }, "metrics_exposed_without_token");
+  }
   metricsServer = createServer(async (req, res) => {
     try {
       if ((req.url ?? "").split("?")[0] !== "/metrics") {
@@ -149,32 +161,44 @@ export async function startMetricsServer(): Promise<void> {
         return;
       }
 
-      const token = process.env.METRICS_TOKEN;
-      if (token && req.headers.authorization !== `Bearer ${token}`) {
-        res.writeHead(401).end();
-        return;
+      if (token) {
+        const provided = Buffer.from(req.headers.authorization ?? "");
+        const expected = Buffer.from(`Bearer ${token}`);
+        const ok =
+          provided.length === expected.length &&
+          timingSafeEqual(provided, expected);
+        if (!ok) {
+          res.writeHead(401).end();
+          return;
+        }
       }
 
       res.setHeader("Content-Type", registry.contentType);
       res.end(await registry.metrics());
     } catch (err) {
-      logger.error({ err }, "metrics_endpoint_failed");
+      logger.error({ err: sanitizeError(err) }, "metrics_endpoint_failed");
       res.writeHead(500).end();
     }
   });
 
-  await new Promise<void>((resolve, reject) => {
-    metricsServer!.once("error", reject);
-    metricsServer!.listen(port, "0.0.0.0", resolve);
+  // Handler persistente: once("error") solo captura el primer fallo.
+  metricsServer.on("error", (err) => {
+    logger.error({ err: sanitizeError(err) }, "metrics_server_error");
   });
 
-  logger.info({ port }, "metrics_server_started");
+  await new Promise<void>((resolve, reject) => {
+    metricsServer!.once("error", reject);
+    metricsServer!.listen(port, host, resolve);
+  });
+
+  logger.info({ port, host }, "metrics_server_started");
 }
 
 export async function stopMetricsServer(): Promise<void> {
   if (!metricsServer) return;
 
   await new Promise<void>((resolve) => {
+    metricsServer!.closeAllConnections?.();
     metricsServer!.close(() => resolve());
   });
 

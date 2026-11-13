@@ -35,7 +35,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 make g+
 # Runtime
 FROM node:24.22.0-bookworm-slim AS runtime
 WORKDIR /app
-ENV NODE_ENV=production
+ENV NODE_ENV=production \
+    NODE_OPTIONS=--enable-source-maps
 
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
@@ -48,5 +49,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||5050)+'/api/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 EXPOSE 5050 9464
+# 9464 solo debe ser accesible desde el namespace de Prometheus.
 
 CMD ["node", "--enable-source-maps", "--import", "./dist/instrumentation.js", "dist/index.js"]

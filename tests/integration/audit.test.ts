@@ -36,7 +36,9 @@ afterAll(async () => {
 afterEach(async () => {
   await User.deleteMany({});
   await Patient.deleteMany({});
-  await AuditLog.deleteMany({});
+  // Bypass deliberado del guard append-only SOLO en tests: usa el driver
+  // nativo, que no pasa por los hooks de Mongoose.
+  await AuditLog.collection.deleteMany({});
 });
 
 describe("auditoría PHI", () => {
@@ -63,15 +65,23 @@ describe("auditoría PHI", () => {
 
     expect(res.body.errors).toBeUndefined();
 
-    const event = await AuditLog.findOne({ operation: "patient" }).lean();
+    const requestId = res.headers["x-request-id"];
+    expect(requestId).toBeTruthy();
+
+    const event = await AuditLog.findOne({
+      operation: "patient",
+      requestId,
+    }).lean();
+
     expect(event).toMatchObject({
       userId: user._id.toString(),
       resourceType: "Patient",
       resourceId: patient._id.toString(),
       result: "success",
+      requestId,
     });
-    expect(event?.requestId).toBeTruthy();
     expect(JSON.stringify(event)).not.toContain("medicalHistory");
+    expect(JSON.stringify(event)).not.toContain("Paciente");
   });
 
   it("no devuelve PHI si la auditoría falla (fail-closed)", async () => {
@@ -79,40 +89,46 @@ describe("auditoría PHI", () => {
       .spyOn(AuditLog, "create")
       .mockRejectedValueOnce(new Error("mongo down"));
 
-    const user = await User.create({
-      name: "Bob",
-      email: "bob@test.com",
-    });
-    const patient = await Patient.create({
-      identifier: "P123",
-      name: "Alice",
-      owner: `${user._id}`,
-      public: false,
-    });
-    if (!JWT_SECRET)
-      throw new Error("JWT_SECRET is not defined in environment variables");
-    const token = jwt.sign(
-      { id: user._id, email: user.email, status: 1, role: 1 },
-      JWT_SECRET,
-    );
+    try {
+      const user = await User.create({
+        name: "Bob",
+        email: "bob@test.com",
+      });
+      const patient = await Patient.create({
+        identifier: "P123",
+        name: "Alice",
+        owner: `${user._id}`,
+      });
+      if (!JWT_SECRET) {
+        throw new Error("JWT_SECRET is not defined in environment variables");
+      }
+      const token = jwt.sign(
+        { id: user._id, email: user.email, status: 1, role: 1 },
+        JWT_SECRET,
+      );
 
-    const res = await request(httpServer)
-      .post("/graphql")
-      .set("Authorization", `Bearer ${token}`)
-      .send(
-        gql(`
-              query {
-                patients {
-                  _id
-                  identifier
-                  name
-                }
+      const res = await request(httpServer)
+        .post("/graphql")
+        .set("Authorization", `Bearer ${token}`)
+        .send(
+          gql(`
+            query {
+              patients {
+                _id
+                identifier
+                name
               }
-            `),
-      )
-      .expect(200);
-    expect(res.body.errors?.[0]?.extensions?.code).toBe("SERVICE_UNAVAILABLE");
+            }
+          `),
+        )
+        .expect(200);
 
-    spy.mockRestore();
+      expect(res.body.errors?.[0]?.extensions?.code).toBe(
+        "SERVICE_UNAVAILABLE",
+      );
+      expect(res.body.data?.patients).toBeFalsy();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

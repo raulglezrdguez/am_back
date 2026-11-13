@@ -75,6 +75,11 @@ const serviceUnavailable = () =>
 export const withAudit =
   (config: AuditConfig, resolver: Resolver): Resolver =>
   async (parent, args, ctx, info) => {
+    // Un listado anónimo sin filtro no toca PHI: no generar ruido forense.
+    if (!ctx.currentUser && !args?.id) {
+      return resolver(parent, args, ctx, info);
+    }
+
     const startedAt = performance.now();
     const operationType =
       info.parentType.name === "Mutation"

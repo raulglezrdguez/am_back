@@ -66,7 +66,9 @@ export const observabilityPlugin: ApolloServerPlugin<ApolloContext> = {
             // No enviar el mensaje original: puede contener PHI.
             const safeError = new Error(code);
             safeError.name = err.name ?? "GraphQLError";
-            safeError.stack = err.stack;
+            // NO copiar err.stack: la primera línea es "Error: <mensaje>"
+            // y puede contener PHI. El stack de safeError apunta al plugin,
+            // que es información suficiente para agrupar el error.
 
             Sentry.captureException(safeError, {
               tags: {

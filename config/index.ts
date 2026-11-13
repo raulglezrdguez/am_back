@@ -1,13 +1,24 @@
-import dotenv from "dotenv";
+import "./env.ts"; // dotenv.config() antes de leer process.env
 import { z } from "zod";
 import { logger } from "../middlewares/logger.ts";
 
-dotenv.config();
+const emptyToUndefined = (value: unknown) =>
+  typeof value === "string" && value.trim() === "" ? undefined : value;
 
-const booleanFromEnv = z
-  .enum(["true", "false"])
-  .optional()
-  .transform((v) => (v === undefined ? undefined : v === "true"));
+const booleanFromEnv = z.preprocess(
+  emptyToUndefined,
+  z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === "true")),
+);
+
+const optionalUrl = z.preprocess(emptyToUndefined, z.string().url().optional());
+
+const optionalString = z.preprocess(
+  emptyToUndefined,
+  z.string().min(1).optional(),
+);
 
 const envSchema = z.object({
   NODE_ENV: z
@@ -31,16 +42,22 @@ const envSchema = z.object({
   METRICS_TOKEN: z.string().optional(),
   OTEL_ENABLED: booleanFromEnv,
   OTEL_SERVICE_NAME: z.string().default("am-back"),
-  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
-  SENTRY_DSN: z.string().url().optional(),
+  OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrl,
+  SENTRY_DSN: optionalUrl,
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
-  FIREBASE_SERVICE_ACCOUNT: z.string().min(1).optional(),
+  FIREBASE_SERVICE_ACCOUNT: optionalString,
   METRICS_HOST: z.string().default("127.0.0.1"),
   AUDIT_HOT_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
-  MONGO_AUDIT_URI: z.string().url().optional(),
+  MONGO_AUDIT_URI: optionalUrl,
+  AUDIT_WRITE_CONCERN: z
+    .enum(["1", "majority"])
+    .default("majority")
+    // El driver espera 1 (número) o "majority"; "1" como string funciona,
+    // pero es mejor normalizarlo para no depender del parser.
+    .transform((value) => (value === "1" ? 1 : "majority")),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -83,5 +100,10 @@ export const IS_PRODUCTION = NODE_ENV === "production";
 export const PORT = NODE_ENV === "test" ? 0 : ENV_PORT;
 
 export const AUDIT_ENABLED = parsed.data.AUDIT_ENABLED ?? true;
-export const AUDIT_FAIL_CLOSED =
-  parsed.data.AUDIT_FAIL_CLOSED ?? parsed.data.NODE_ENV === "production";
+// Fail-closed SIEMPRE por defecto, también en dev/staging.
+// Para una reversión temporal documentada: AUDIT_FAIL_CLOSED=false.
+export const AUDIT_FAIL_CLOSED = parsed.data.AUDIT_FAIL_CLOSED ?? true;
+export const AUDIT_WRITE_CONCERN = parsed.data.AUDIT_WRITE_CONCERN;
+
+// Precedencia documentada: si AUDIT_ENABLED=false no se escribe nada y
+// AUDIT_FAIL_CLOSED no tiene efecto (no hay escritura que pueda fallar).

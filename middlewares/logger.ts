@@ -1,9 +1,13 @@
+import "../config/env.ts"; // PRIMERO: LOG_LEVEL/APP_VERSION de .env
 import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import pino, { type Logger } from "pino";
 import { trace } from "@opentelemetry/api";
 import type { NextFunction, Request, Response } from "express";
 
+const TRUST_PROXY = process.env.TRUST_PROXY
+  ? Number(process.env.TRUST_PROXY)
+  : 0;
 const REQUEST_ID_RE = /^[A-Za-z0-9._-]{8,128}$/;
 
 export const logger: Logger = pino({
@@ -49,7 +53,9 @@ export function requestIdMiddleware(
   const incoming = req.headers["x-request-id"];
   const candidate = Array.isArray(incoming) ? incoming[0] : incoming;
   const requestId =
-    candidate && REQUEST_ID_RE.test(candidate) ? candidate : randomUUID();
+    TRUST_PROXY > 0 && candidate && REQUEST_ID_RE.test(candidate)
+      ? candidate
+      : randomUUID();
 
   req.id = requestId;
   res.setHeader("x-request-id", requestId);
@@ -122,8 +128,17 @@ export function sanitizeError(err: unknown): Record<string, unknown> {
     base.message = "duplicate_key";
   }
 
-  if (e.stack && process.env.NODE_ENV !== "production") {
-    base.stack = String(e.stack).slice(0, 4000);
+  // El stack de V8 empieza por "Error: <mensaje>". Ese mensaje puede contener
+  // PHI (nombre de paciente, identificador, etc.). Por defecto NO se emite.
+  // Si se necesita para depurar, se habilita con LOG_ERROR_STACK=1 y se
+  // elimina la primera línea.
+  if (e.stack && process.env.LOG_ERROR_STACK === "1") {
+    base.stack = String(e.stack)
+      .split("\n")
+      .slice(1) // fuera "Error: <mensaje>"
+      .slice(0, 20) // máximo 20 frames
+      .join("\n")
+      .slice(0, 4000);
   }
 
   return base;

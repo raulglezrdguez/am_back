@@ -13,6 +13,10 @@ import {
   NODE_ENV,
 } from "../../config/index.ts";
 import { isFirebaseInitialized } from "../../config/admin.firebase.ts";
+import {
+  getAuditConnection,
+  isAuditDbConfigured,
+} from "../../config/auditDb.ts";
 
 type DependencyStatus = "up" | "down" | "degraded" | "disabled";
 
@@ -106,6 +110,8 @@ const checkRedis = async (): Promise<DependencyCheck> => {
 let firebaseCache: { at: number; result: DependencyCheck } | null = null;
 
 const checkFirebase = async (): Promise<DependencyCheck> => {
+  if (NODE_ENV === "test") return { status: "disabled" };
+
   if (firebaseCache && Date.now() - firebaseCache.at < FIREBASE_CHECK_TTL_MS) {
     return firebaseCache.result;
   }
@@ -140,6 +146,34 @@ const checkFirebase = async (): Promise<DependencyCheck> => {
   }
 };
 
+const checkAuditDb = async (): Promise<DependencyCheck> => {
+  if (!isAuditDbConfigured()) return { status: "disabled" };
+
+  const conn = getAuditConnection();
+  if (!conn || conn.readyState !== 1 || !conn.db) {
+    return {
+      status: "down",
+      error: conn ? `readyState_${conn.readyState}` : "not_connected",
+    };
+  }
+
+  const startedAt = performance.now();
+
+  try {
+    await withTimeout(conn.db.admin().ping(), "audit_ping");
+    return {
+      status: "up",
+      latencyMs: Math.round(performance.now() - startedAt),
+    };
+  } catch (err) {
+    return {
+      status: "down",
+      latencyMs: Math.round(performance.now() - startedAt),
+      error: errorCode(err),
+    };
+  }
+};
+
 export const getLiveness = (_req: Request, res: Response) => {
   res.setHeader("Cache-Control", "no-store");
   return res.status(200).json({
@@ -157,10 +191,11 @@ export const getReadiness = async (req: Request, res: Response) => {
     return res.status(503).json({ status: "draining" });
   }
 
-  const [mongo, redis, firebase] = await Promise.all([
+  const [mongo, redis, firebase, audit] = await Promise.all([
     checkMongo(),
     checkRedis(),
     checkFirebase(),
+    checkAuditDb(),
   ]);
 
   dependencyUp.set({ dependency: "mongo" }, mongo.status === "up" ? 1 : 0);
@@ -169,10 +204,24 @@ export const getReadiness = async (req: Request, res: Response) => {
     { dependency: "firebase" },
     firebase.status === "up" ? 1 : 0,
   );
+  if (isAuditDbConfigured()) {
+    dependencyUp.set({ dependency: "audit_db" }, audit.status === "up" ? 1 : 0);
+  } else {
+    // No inventar una serie "down" si la auditoría no está configurada:
+    // dispararía AmBackAuditDbDown en local/staging.
+    dependencyUp.remove({ dependency: "audit_db" });
+  }
   mongoReadyState.set(mongo.status === "up" ? 1 : 0);
 
-  const criticalDown = mongo.status === "down" || redis.status === "down";
-  const degraded = firebase.status === "degraded";
+  // Redis no es crítico: el rate limit hace fail-open y tumbar todos los pods
+  // convertiría una degradación parcial en una caída total.
+  const criticalDown =
+    mongo.status === "down" ||
+    (audit.status === "down" && isAuditDbConfigured());
+  const degraded =
+    redis.status === "down" ||
+    firebase.status === "down" ||
+    firebase.status === "degraded";
   const status = criticalDown ? "error" : degraded ? "degraded" : "ok";
 
   if (criticalDown) res.setHeader("Retry-After", "5");
@@ -180,7 +229,7 @@ export const getReadiness = async (req: Request, res: Response) => {
   if (criticalDown && Date.now() - lastFailureLogAt > 60_000) {
     lastFailureLogAt = Date.now();
     logger.error(
-      { requestId: req.id, checks: { mongo, redis, firebase } },
+      { requestId: req.id, checks: { mongo, redis, firebase, audit } },
       "readiness_failed",
     );
   }
@@ -191,7 +240,7 @@ export const getReadiness = async (req: Request, res: Response) => {
     uptime: process.uptime(),
     version: APP_VERSION,
     timestamp: new Date().toISOString(),
-    checks: { mongo, redis, firebase },
+    checks: { mongo, redis, firebase, audit },
   });
 };
 

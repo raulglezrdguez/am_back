@@ -1,14 +1,19 @@
 import { randomUUID } from "node:crypto";
-import AuditLog, {
+import {
   type AuditOperationType,
   type AuditResult,
 } from "../models/auditLog.model.ts";
+import { getAuditModel } from "../config/auditDb.ts";
 import { logger, sanitizeError } from "../middlewares/logger.ts";
 import {
   auditEventsTotal,
   auditWriteFailuresTotal,
 } from "../config/metrics.ts";
-import { AUDIT_ENABLED, AUDIT_FAIL_CLOSED } from "../config/index.ts";
+import {
+  AUDIT_ENABLED,
+  AUDIT_FAIL_CLOSED,
+  AUDIT_WRITE_CONCERN,
+} from "../config/index.ts";
 
 export type AuditContext = {
   requestId: string;
@@ -92,6 +97,7 @@ const sanitizeMetadata = (metadata: AuditMetadata = {}) => {
       typeof value === "number" ||
       typeof value === "boolean"
     ) {
+      if (typeof value === "number" && !Number.isFinite(value)) continue;
       clean[key] = typeof value === "string" ? truncate(value, 128) : value;
     }
   }
@@ -102,7 +108,7 @@ const sanitizeMetadata = (metadata: AuditMetadata = {}) => {
 const safeResourceId = (value: string | null | undefined): string | null => {
   if (!value) return null;
   if (AUDIT_ID_RE.test(value)) return value;
-  logger.warn({ resourceId: value.slice(0, 64) }, "audit_resource_id_rejected");
+  logger.warn({ resourceIdLength: value.length }, "audit_resource_id_rejected");
   return null;
 };
 
@@ -141,8 +147,11 @@ export async function writeAuditEvent(
   };
 
   try {
-    await AuditLog.create([doc], {
-      writeConcern: { w: "majority", j: true },
+    await getAuditModel().create([doc], {
+      writeConcern: {
+        w: AUDIT_WRITE_CONCERN,
+        j: true,
+      },
     });
 
     auditEventsTotal.inc({

@@ -10,14 +10,21 @@
   },
   "packageManager": "npm@11.19.1",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
     "start": "node --enable-source-maps --import ./dist/instrumentation.js dist/index.js",
     "dev": "tsx watch index.ts",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "typecheck:tests": "tsc -p tsconfig.json --noEmit",
     "test:unit": "NODE_OPTIONS=\"--experimental-vm-modules\" jest tests/unit --runInBand --detectOpenHandles",
     "test:int": "NODE_OPTIONS=\"--experimental-vm-modules\" jest tests/integration --runInBand --detectOpenHandles --forceExit",
-    "test": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --runInBand --coverage --detectOpenHandles --forceExit"
+    "test": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --runInBand --coverage --detectOpenHandles --forceExit",
+    "audit:indexes": "mongosh \"$MONGO_ADMIN_URI\" scripts/audit-log-collection.js",
+    "audit:migrate": "mongosh \"$MONGO_ADMIN_URI\" scripts/migrate-audit-db.js",
+    "audit:archive": "mongosh \"$MONGO_ARCHIVER_URI\" scripts/archive-audit-logs.js",
+    "audit:purge": "mongosh \"$MONGO_ARCHIVER_URI\" scripts/purge-audit-archive.js",
+    "audit:roles": "mongosh \"$MONGO_ADMIN_URI\" scripts/mongo-audit-roles.js",
+    "check:scripts": "node --check scripts/archive-audit-logs.js && node --check scripts/audit-log-collection.js && node --check scripts/mongo-audit-roles.js && node --check scripts/migrate-audit-db.js && node --check scripts/purge-audit-archive.js"
   },
   "keywords": [],
   "author": "",

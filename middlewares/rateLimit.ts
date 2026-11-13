@@ -34,8 +34,16 @@ export async function connectRedis(): Promise<void> {
   client.on("end", () => logger.warn("redis_end"));
   client.on("reconnecting", () => logger.warn("redis_reconnecting"));
 
-  await client.connect();
+  // Asignar ANTES de conectar: si connect() falla, el cliente sigue
+  // reintentando en segundo plano y readiness/shutdown deben poder verlo.
   redisClient = client;
+
+  try {
+    await client.connect();
+  } catch (err) {
+    logger.error({ err: sanitizeError(err) }, "redis_connect_failed");
+    throw err;
+  }
 }
 
 const storeFor = (prefix: string) =>

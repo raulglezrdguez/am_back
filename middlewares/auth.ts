@@ -1,7 +1,7 @@
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
 
-import { JWT_SECRET } from "../config/index.ts";
+import { JWT_SECRET, NODE_ENV } from "../config/index.ts";
 import User from "../models/user.model.ts";
 import adminFirebase from "../config/admin.firebase.ts";
 import type { DecodedIdToken } from "firebase-admin/auth";
@@ -63,53 +63,49 @@ const verifyLocalUser = async (token: string, req: any) => {
   }
 };
 
+type FirebaseFailureReason =
+  | "TOKEN_REVOKED"
+  | "SESSION_COOKIE_REVOKED"
+  | "INVALID_TOKEN";
+
+type FirebaseTokenResult =
+  | {
+      user: DecodedIdToken;
+      reason?: undefined;
+      tokenType: "id_token" | "session_cookie";
+    }
+  | {
+      user: null;
+      reason: FirebaseFailureReason;
+      tokenType: "id_token" | "session_cookie";
+    };
+
 const verifyFirebaseToken = async (
   token: string,
-  req: any,
-): Promise<DecodedIdToken | null> => {
+): Promise<FirebaseTokenResult> => {
   try {
     // checkRevoked = true: rechaza tokens de usuarios deshabilitados o sesiones revocadas
-    return await adminFirebase.auth().verifyIdToken(token, true);
+    const user = await adminFirebase.auth().verifyIdToken(token, true);
+    return { user, tokenType: "id_token" };
   } catch (idTokenError: any) {
     // Si el token fue revocado explícitamente, no intentes session cookie
     if (idTokenError?.code === "auth/id-token-revoked") {
-      // Token revocado
-      auditAuth(req, {
-        operation: "auth.token",
-        operationType: "system",
-        resourceType: "Auth",
-        result: "denied",
-        reason: "TOKEN_REVOKED",
-        metadata: { method: "firebase", tokenType: "id_token" },
-      });
-      return null;
+      return { user: null, reason: "TOKEN_REVOKED", tokenType: "id_token" };
     }
+
     try {
       // checkRevoked = true para session cookies también
-      return await adminFirebase.auth().verifySessionCookie(token, true);
+      const user = await adminFirebase.auth().verifySessionCookie(token, true);
+      return { user, tokenType: "session_cookie" };
     } catch (sessionError: any) {
-      if (sessionError?.code === "auth/session-cookie-revoked") {
-        // Session cookie revocada
-        auditAuth(req, {
-          operation: "auth.token",
-          operationType: "system",
-          resourceType: "Auth",
-          result: "denied",
-          reason: "SESSION_COOKIE_REVOKED",
-          metadata: { method: "firebase", tokenType: "session_cookie" },
-        });
-      } else {
-        // Token inválido
-        auditAuth(req, {
-          operation: "auth.token",
-          operationType: "system",
-          resourceType: "Auth",
-          result: "denied",
-          reason: "INVALID_TOKEN",
-          metadata: { method: "firebase" },
-        });
-      }
-      return null;
+      return {
+        user: null,
+        reason:
+          sessionError?.code === "auth/session-cookie-revoked"
+            ? "SESSION_COOKIE_REVOKED"
+            : "INVALID_TOKEN",
+        tokenType: "session_cookie",
+      };
     }
   }
 };
@@ -143,108 +139,119 @@ export async function authMiddleware(
       return next();
     }
 
+    if (NODE_ENV === "test") {
+      // En tests no se llama a Firebase: evita red y credenciales reales.
+      req.user = null;
+      return next();
+    }
+
     // Verificar token de Firebase si es un token de Firebase
-    const firebaseUser = await verifyFirebaseToken(token, req);
+    const firebaseResult = await verifyFirebaseToken(token);
 
-    if (firebaseUser) {
-      // bloquear cualquier operación con email no verificado
-      if (!firebaseUser.email_verified) {
-        // Email no verificado: NO loguear el email
-        auditAuth(req, {
-          operation: "auth.email",
-          operationType: "system",
-          resourceType: "Auth",
-          result: "denied",
-          reason: "EMAIL_UNVERIFIED",
-          metadata: { method: "firebase", emailVerified: false },
-        });
-        req.user = null;
-        return next();
-      }
-
-      const dbUser = await User.findOne({ email: firebaseUser.email }).lean();
-      if (dbUser) {
-        if (dbUser.status === 1) {
-          req.user = {
-            id: dbUser._id.toString(),
-            name: dbUser.name,
-            email: dbUser.email,
-            role: dbUser.role,
-            status: dbUser.status,
-          };
-        } else {
-          // Usuario inactivo
-          auditAuth(req, {
-            operation: "auth.user",
-            operationType: "system",
-            resourceType: "User",
-            resourceId: dbUser._id.toString(),
-            result: "denied",
-            reason: "USER_INACTIVE",
-            metadata: { method: "firebase" },
-          });
-
-          req.user = null;
-        }
-      } else if (firebaseUser.name && firebaseUser.email) {
-        const newDbUser = await User.create({
-          name: firebaseUser.name,
-          email: firebaseUser.email,
-          role: 1,
-          status: 0, // ⚠️ inactivo hasta aprobación manual
-        });
-
-        // Usuario provisionado automáticamente
-        auditAuth(req, {
-          operation: "auth.user.provision",
-          operationType: "system",
-          resourceType: "User",
-          resourceId: newDbUser._id.toString(),
-          result: "success",
-          metadata: { method: "firebase", provisioned: true },
-        });
-
-        req.user = null;
-      } else {
-        // JWT inválido / usuario no encontrado
-        auditAuth(req, {
-          operation: "auth.jwt",
-          operationType: "system",
-          resourceType: "Auth",
-          result: "denied",
-          reason: "JWT_INVALID",
-          metadata: { method: "jwt" },
-        });
-
-        req.user = null;
-      }
-    } else {
-      // JWT inválido / usuario no encontrado
+    if (!firebaseResult.user) {
+      // Un único evento, con el motivo específico del fallo.
       auditAuth(req, {
-        operation: "auth.jwt",
+        operation: "auth.token",
         operationType: "system",
         resourceType: "Auth",
         result: "denied",
-        reason: "JWT_INVALID",
-        metadata: { method: "jwt" },
+        reason: firebaseResult.reason,
+        metadata: {
+          method: "firebase",
+          tokenType: firebaseResult.tokenType,
+        },
+      });
+      req.user = null;
+      return next();
+    }
+
+    const firebaseUser = firebaseResult.user;
+
+    // bloquear cualquier operación con email no verificado
+    if (!firebaseUser.email_verified) {
+      // Email no verificado: NO loguear el email
+      auditAuth(req, {
+        operation: "auth.email",
+        operationType: "system",
+        resourceType: "Auth",
+        result: "denied",
+        reason: "EMAIL_UNVERIFIED",
+        metadata: { method: "firebase", emailVerified: false },
+      });
+      req.user = null;
+      return next();
+    }
+
+    const dbUser = await User.findOne({ email: firebaseUser.email }).lean();
+
+    if (dbUser) {
+      if (dbUser.status === 1) {
+        req.user = {
+          id: dbUser._id.toString(),
+          name: dbUser.name,
+          email: dbUser.email,
+          role: dbUser.role,
+          status: dbUser.status,
+        };
+      } else {
+        // Usuario inactivo
+        auditAuth(req, {
+          operation: "auth.user",
+          operationType: "system",
+          resourceType: "User",
+          resourceId: dbUser._id.toString(),
+          result: "denied",
+          reason: "USER_INACTIVE",
+          metadata: { method: "firebase" },
+        });
+        req.user = null;
+      }
+    } else if (firebaseUser.name && firebaseUser.email) {
+      const newDbUser = await User.create({
+        name: firebaseUser.name,
+        email: firebaseUser.email,
+        role: 1,
+        status: 0, // ⚠️ inactivo hasta aprobación manual
       });
 
+      // Usuario provisionado automáticamente
+      auditAuth(req, {
+        operation: "auth.user.provision",
+        operationType: "system",
+        resourceType: "User",
+        resourceId: newDbUser._id.toString(),
+        result: "success",
+        metadata: { method: "firebase", provisioned: true },
+      });
+
+      req.user = null;
+    } else {
+      // Token de Firebase válido pero sin perfil utilizable (sin name/email)
+      auditAuth(req, {
+        operation: "auth.firebase.profile",
+        operationType: "system",
+        resourceType: "Auth",
+        result: "denied",
+        reason: "PROFILE_INCOMPLETE",
+        metadata: { method: "firebase" },
+      });
       req.user = null;
     }
 
     next();
   } catch (err) {
-    // JWT inválido / usuario no encontrado
+    // Red de seguridad: solo debería llegarse aquí por un fallo inesperado
+    // (Mongo caído, etc.), no por un token inválido.
+    logger.debug({ err: sanitizeError(err) }, "auth_unexpected_failure");
     auditAuth(req, {
-      operation: "auth.jwt",
+      operation: "auth.unexpected",
       operationType: "system",
       resourceType: "Auth",
-      result: "denied",
-      reason: "JWT_INVALID",
-      metadata: { method: "jwt" },
+      result: "error",
+      reason: "AUTH_PIPELINE_ERROR",
+      metadata: { method: "unknown" },
     });
-
-    req.user = null; // token inválido → anónimo
+    req.user = null; // fallo inesperado → anónimo (fail-closed aguas abajo)
     next();
   }
 }
