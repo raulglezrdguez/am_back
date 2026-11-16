@@ -67,4 +67,13 @@ describe("health", () => {
     expect(res.status).toBe(503);
     expect(res.body.status).toBe("draining");
   });
+
+  it("readiness incluye siempre el check de auditoría", async () => {
+    const res = await request(httpServer).get("/api/health/ready");
+
+    expect(res.body.checks).toHaveProperty("audit");
+    expect(["up", "down", "degraded", "disabled"]).toContain(
+      res.body.checks.audit.status,
+    );
+  });
 });

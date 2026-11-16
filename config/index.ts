@@ -58,6 +58,7 @@ const envSchema = z.object({
     // El driver espera 1 (número) o "majority"; "1" como string funciona,
     // pero es mejor normalizarlo para no depender del parser.
     .transform((value) => (value === "1" ? 1 : "majority")),
+  AUDIT_ALLOW_SHARED_DB: booleanFromEnv,
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -65,6 +66,31 @@ const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
   logger.fatal({ errors: parsed.error.flatten().fieldErrors }, "invalid_env");
   process.exit(1); // Aborta el arranque
+}
+
+// Sin DB dedicada, los eventos se escriben en la DB de la app con un usuario
+// readWrite y el append-only queda solo en hooks de Mongoose (bypassables con
+// el driver nativo). En producción eso no es aceptable.
+if (
+  parsed.data.NODE_ENV === "production" &&
+  parsed.data.AUDIT_ALLOW_SHARED_DB !== true &&
+  parsed.data.AUDIT_ENABLED !== false &&
+  !parsed.data.MONGO_AUDIT_URI
+) {
+  logger.fatal(
+    {
+      hint: "Define MONGO_AUDIT_URI. Para una transición documentada: AUDIT_ALLOW_SHARED_DB=true",
+    },
+    "audit_db_required_in_production",
+  );
+  process.exit(1);
+}
+
+if (
+  parsed.data.NODE_ENV === "production" &&
+  parsed.data.AUDIT_ENABLED === false
+) {
+  logger.warn("audit_disabled_in_production");
 }
 
 export const {
@@ -91,6 +117,7 @@ export const {
   METRICS_HOST,
   AUDIT_HOT_RETENTION_DAYS,
   MONGO_AUDIT_URI,
+  AUDIT_ALLOW_SHARED_DB,
 } = parsed.data;
 
 // Flag explícito calculado una sola vez

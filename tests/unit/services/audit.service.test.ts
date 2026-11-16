@@ -3,7 +3,12 @@ import {
   AuditUnavailableError,
   writeAuditEvent,
 } from "../../../services/audit.service.ts";
-import AuditLog from "../../../models/auditLog.model.ts";
+import { getAuditModel } from "../../../config/auditDb.ts";
+
+// getAuditModel() devuelve el modelo de la conexión dedicada si existe y el
+// de la conexión por defecto si no. Espiar ese objeto hace que el test siga
+// siendo válido con MONGO_AUDIT_URI definida.
+const spyOnCreate = () => jest.spyOn(getAuditModel(), "create");
 
 const ctx = {
   requestId: "req-test-1",
@@ -27,7 +32,7 @@ afterEach(() => {
 
 describe("writeAuditEvent", () => {
   it("descarta metadata no permitida (nunca escribe PHI)", async () => {
-    const spy = jest.spyOn(AuditLog, "create").mockResolvedValue([] as any);
+    const spy = spyOnCreate().mockResolvedValue([] as any);
 
     await writeAuditEvent(
       {
@@ -49,9 +54,7 @@ describe("writeAuditEvent", () => {
   });
 
   it("lanza AuditUnavailableError si failClosed y la escritura falla", async () => {
-    jest
-      .spyOn(AuditLog, "create")
-      .mockRejectedValueOnce(new Error("mongo down"));
+    spyOnCreate().mockRejectedValueOnce(new Error("mongo down"));
 
     await expect(
       writeAuditEvent(base, ctx, { failClosed: true }),
@@ -59,9 +62,7 @@ describe("writeAuditEvent", () => {
   });
 
   it("no lanza si failClosed=false (post-auditoría best-effort)", async () => {
-    jest
-      .spyOn(AuditLog, "create")
-      .mockRejectedValueOnce(new Error("mongo down"));
+    spyOnCreate().mockRejectedValueOnce(new Error("mongo down"));
 
     await expect(
       writeAuditEvent(base, ctx, { failClosed: false }),
@@ -69,7 +70,7 @@ describe("writeAuditEvent", () => {
   });
 
   it("rechaza resourceId que no es ObjectId", async () => {
-    const spy = jest.spyOn(AuditLog, "create").mockResolvedValue([] as any);
+    const spy = spyOnCreate().mockResolvedValue([] as any);
 
     await writeAuditEvent({ ...base, resourceId: "not-an-object-id" }, ctx);
 

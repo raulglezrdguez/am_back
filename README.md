@@ -20,7 +20,7 @@ This API is deployed to a private environment. Access is restricted to authorize
 
 ## Prerequisites
 
-- Node.js 24 LTS (mínimo 22.18)
+- Node.js 24 LTS (minimum 22.18)
 - MongoDB 6.x (local or Atlas)
 - Firebase project with service account credentials
 - npm package manager
@@ -131,6 +131,27 @@ Test features
 | `npm run typecheck` | Check code                               |
 | `npm run dev`       | Run development server                   |
 | `tsx watch`         | Typescript watch                         |
+
+## Health
+
+- `GET /api/health/live` — liveness. Never queries dependencies.
+- `GET /api/health/ready` — readiness. 503 if Mongo or the dedicated audit DB are down, or during draining. 200 degraded if Redis or Firebase fail (they are not critical).
+- `GET /health` — legacy alias of readiness.
+
+## Audit
+
+`audit_logs` lives in a dedicated database (`MONGO_AUDIT_URI`) and is append-only across three layers: Mongoose hooks, collection validator, and Mongo `insert` role. The application user has no access to that database.
+
+Scripts (always with the admin/archiver user, never with the app user):
+
+    npm run audit:roles     # users and roles (idempotent)
+    npm run audit:indexes   # validator + indexes
+    npm run audit:migrate   # dry-run; AUDIT_MIGRATE_APPLY=true to apply
+    npm run audit:archive   # dry-run; AUDIT_ARCHIVE_APPLY=true to apply
+    npm run audit:purge     # dry-run; AUDIT_PURGE_APPLY=true to apply
+
+Requirements: replica set (write concern `majority`), `authSource=admin` in the URIs, and `MONGO_AUDIT_URI` mandatory in production.
+
 
 ## Docker
 

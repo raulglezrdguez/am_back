@@ -34,7 +34,12 @@ if (targetDbName === sourceDbName) {
 
 const source = db.getSiblingDB(sourceDbName).audit_logs;
 const target = db.getSiblingDB(targetDbName).audit_logs;
-const batchSize = Number(process.env.AUDIT_MIGRATION_BATCH_SIZE ?? 5000);
+const parsedBatch = Number(process.env.AUDIT_MIGRATION_BATCH_SIZE ?? 5000);
+if (!Number.isInteger(parsedBatch) || parsedBatch <= 0) {
+  throw new Error("AUDIT_MIGRATION_BATCH_SIZE debe ser un entero positivo");
+}
+const batchSize = parsedBatch;
+const maxBatches = Number(process.env.AUDIT_MIGRATION_MAX_BATCHES ?? 100000);
 
 const total = source.countDocuments({});
 print(
@@ -44,20 +49,26 @@ print(
 
 let moved = 0;
 let batches = 0;
+let lastId = null;
 
 while (true) {
-  const batch = source
-    .find({})
-    .sort({ timestamp: 1 })
-    .limit(batchSize)
-    .toArray();
+  if (batches >= maxBatches) {
+    throw new Error(`max_batches_exceeded (${maxBatches})`);
+  }
+
+  // Paginación por _id: en dry-run nada cambia en el origen, así que un
+  // find() sin cursor devolvería siempre el mismo lote (bucle infinito).
+  const filter = lastId === null ? {} : { _id: { $gt: lastId } };
+  const batch = source.find(filter).sort({ _id: 1 }).limit(batchSize).toArray();
+
   if (batch.length === 0) break;
+
   batches += 1;
+  lastId = batch[batch.length - 1]._id;
 
   if (!apply) {
-    print(`[dry-run] lote ${batches}: movería ${batch.length} eventos`);
     moved += batch.length;
-    if (batch.length < batchSize) break;
+    print(`[dry-run] lote ${batches}: movería ${batch.length} eventos`);
     continue;
   }
 
@@ -83,8 +94,6 @@ while (true) {
   source.deleteMany({ _id: { $in: ids } });
   moved += ids.length;
   print(`lote ${batches}: ${ids.length} movidos (total ${moved})`);
-
-  if (batch.length < batchSize) break;
 }
 
 print(

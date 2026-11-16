@@ -15,6 +15,7 @@ import { JWT_SECRET } from "../../config/index.ts";
 import User from "../../models/user.model.ts";
 import Patient from "../../models/patient.model.ts";
 import AuditLog from "../../models/auditLog.model.ts";
+import { getAuditModel } from "../../config/auditDb.ts";
 
 const gql = (q: any) => ({ query: q });
 
@@ -86,7 +87,7 @@ describe("auditoría PHI", () => {
 
   it("no devuelve PHI si la auditoría falla (fail-closed)", async () => {
     const spy = jest
-      .spyOn(AuditLog, "create")
+      .spyOn(getAuditModel(), "create")
       .mockRejectedValueOnce(new Error("mongo down"));
 
     try {

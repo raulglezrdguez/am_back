@@ -119,7 +119,105 @@ jobs:
       - name: App user cannot delete audit logs
         run: |
           set +e
-          OUT=$(mongosh "mongodb://am_app:app-pass@127.0.0.1:27018/am_audit?replicaSet=rs0&directConnection=true" \
+          OUT=$(mongosh "mongodb://am_app:app-pass@127.0.0.1:27018/am_audit?authSource=admin&replicaSet=rs0&directConnection=true" \
             --quiet --eval 'db.audit_logs.deleteOne({})' 2>&1)
           echo "$OUT"
           echo "$OUT" | grep -q "not authorized"
+      - name: Audit writer is insert-only
+        run: |
+          mongosh "mongodb://am_audit_writer:audit-pass@127.0.0.1:27018/am_audit?authSource=admin&replicaSet=rs0&directConnection=true" \
+            --quiet --eval 'db.audit_logs.insertOne({eventId:"ci-1",timestamp:new Date(),requestId:"ci",operation:"ci",operationType:"system",resourceType:"CI",result:"success"}); print("insert ok")' \
+            | grep -q "insert ok"
+
+          set +e
+          OUT=$(mongosh "mongodb://am_audit_writer:audit-pass@127.0.0.1:27018/am_audit?authSource=admin&replicaSet=rs0&directConnection=true" \
+            --quiet --eval 'db.audit_logs.deleteOne({})' 2>&1)
+          echo "$OUT"
+          echo "$OUT" | grep -q "not authorized"
+
+  audit-e2e:
+    runs-on: ubuntu-latest
+    needs: quality
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start two Mongo replica sets (app y auditoría)
+        run: |
+          docker run -d --name mongo-app  -p 27018:27017 mongo:7 --replSet rs0 --bind_ip_all
+          docker run -d --name mongo-audit -p 27019:27017 mongo:7 --replSet rs0 --bind_ip_all
+          for p in 27018 27019; do
+            for i in $(seq 1 30); do
+              docker exec $( [ $p = 27018 ] && echo mongo-app || echo mongo-audit ) \
+                mongosh --quiet --eval 'db.runCommand({ping:1}).ok' >/dev/null 2>&1 && break
+              sleep 2
+            done
+            docker exec $( [ $p = 27018 ] && echo mongo-app || echo mongo-audit ) \
+              mongosh --quiet --eval "rs.initiate({_id:'rs0',members:[{_id:0,host:'127.0.0.1:$p'}]})"
+          done
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Escribir un evento y comprobar el aislamiento
+        env:
+          NODE_ENV: production
+          # OJO: connectDB rechaza "127.0.0.1" en producción. Usa localhost.
+          MONGO_URI: mongodb://localhost:27018/am_test?replicaSet=rs0&directConnection=true
+          MONGO_AUDIT_URI: mongodb://localhost:27019/am_audit?replicaSet=rs0&directConnection=true
+          JWT_SECRET: ci-secret-with-at-least-32-characters
+          REDIS_URL: redis://127.0.0.1:6379
+          AUDIT_ENABLED: "true"
+          AUDIT_FAIL_CLOSED: "true"
+          OTEL_ENABLED: "false"
+        run: |
+          cat > /tmp/e2e.mjs <<'EOF'
+          // El script vive en /tmp: resuelve los imports contra el cwd del job.
+          import { createRequire } from "node:module";
+          import { resolve } from "node:path";
+          import { pathToFileURL } from "node:url";
+
+          const require = createRequire(import.meta.url);
+          const mongoose = require(resolve(process.cwd(), "node_modules/mongoose"));
+          const load = (p) => import(pathToFileURL(resolve(process.cwd(), p)).href);
+
+          await load("dist/config/index.js");
+          const { connectDB } = await load("dist/config/db.js");
+          const { connectAuditDB, getAuditModel, closeAuditDB } = await load("dist/config/auditDb.js");
+          const { writeAuditEvent } = await load("dist/services/audit.service.js");
+          const { getReadiness } = await load("dist/api/controllers/health.controller.js");
+
+          await connectDB();
+          await connectAuditDB();
+          await writeAuditEvent(
+            { operation: "ci", operationType: "system", resourceType: "CI", result: "success" },
+            { requestId: "ci-e2e" },
+          );
+          const appCount = await mongoose.connection.db.collection("audit_logs").countDocuments();
+          const auditCount = await getAuditModel().db.collection("audit_logs").countDocuments();
+          if (appCount !== 0) throw new Error(`PHI en la DB de la app: ${appCount}`);
+          if (auditCount < 1) throw new Error("No se escribió en la DB de auditoría");
+
+          const call = async () => {
+            const res = { headers: {}, setHeader(k, v) { this.headers[k] = v; },
+              status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
+            await getReadiness({ id: "ci" }, res);
+            return res;
+          };
+          const up = await call();
+          if (up.code !== 200 || up.body.checks.audit.status !== "up") {
+            throw new Error(`readiness esperada 200/up: ${up.code} ${JSON.stringify(up.body.checks)}`);
+          }
+
+          await closeAuditDB();
+          const down = await call();
+          if (down.code !== 503) throw new Error(`readiness esperada 503: ${down.code}`);
+          console.log("audit-e2e OK");
+          process.exit(0);
+          EOF
+          node /tmp/e2e.mjs
