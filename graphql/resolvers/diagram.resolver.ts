@@ -4,6 +4,8 @@ import type {
   UpdateDiagramInput,
 } from "../../types/diagram.d.ts";
 import { type ApolloContext } from "../../config/apollo.context.ts";
+import { forbidden, notFound, unauthenticated } from "../../errors/appError.ts";
+import { gqlError } from "../authz.ts";
 
 export default {
   Query: {
@@ -46,7 +48,7 @@ export default {
       { input }: { input: CreateDiagramInput },
       { currentUser }: ApolloContext,
     ) => {
-      if (!currentUser) throw new Error("Authentication required");
+      if (!currentUser) throw gqlError(unauthenticated());
       const diagramInput = { ...input, author: currentUser.id };
       return diagramService.createDiagram(diagramInput);
     },
@@ -55,13 +57,13 @@ export default {
       { id, input }: { id: string; input: Partial<UpdateDiagramInput> },
       { currentUser }: ApolloContext,
     ) => {
-      if (!currentUser) throw new Error("Authentication required");
+      if (!currentUser) throw gqlError(unauthenticated());
 
       const diagram = await diagramService.getDiagramByAuthorId(
         id,
         currentUser.id,
       );
-      if (!diagram) throw new Error("Diagram not found");
+      if (!diagram) throw gqlError(notFound("Resource not found"));
 
       return diagramService.updateDiagram(id, input);
     },
@@ -70,12 +72,12 @@ export default {
       { id }: { id: string },
       { currentUser }: ApolloContext,
     ) => {
-      if (!currentUser) throw new Error("Authentication required");
+      if (!currentUser) throw gqlError(unauthenticated());
 
       const diagram = await diagramService.getDiagramById(id);
-      if (!diagram) throw new Error("Diagram not found");
+      if (!diagram) throw gqlError(notFound("Resource not found"));
       if (diagram.author._id.toString() !== currentUser.id)
-        throw new Error("Not authorized to delete this diagram");
+        throw gqlError(forbidden("Not allowed"));
 
       return diagramService.deleteDiagram(id);
     },
@@ -84,13 +86,12 @@ export default {
       { id, input }: { id: string; input: Partial<UpdateDiagramInput> },
       { currentUser }: ApolloContext,
     ) => {
-      if (!currentUser) throw new Error("Authentication required");
+      if (!currentUser) throw gqlError(unauthenticated());
 
-      if (currentUser.role !== 0)
-        throw new Error("Not authorized to update diagram");
+      if (currentUser.role !== 0) throw gqlError(forbidden("Not allowed"));
 
       const diagram = await diagramService.getDiagramById(id);
-      if (!diagram) throw new Error("Diagram not found");
+      if (!diagram) throw gqlError(notFound("Resource not found"));
 
       return diagramService.updateDiagram(id, input);
     },
@@ -99,13 +100,12 @@ export default {
       { id }: { id: string },
       { currentUser }: ApolloContext,
     ) => {
-      if (!currentUser) throw new Error("Authentication required");
+      if (!currentUser) throw gqlError(unauthenticated());
 
-      if (currentUser.role !== 0)
-        throw new Error("Not authorized to delete diagram");
+      if (currentUser.role !== 0) throw gqlError(forbidden("Not allowed"));
 
       const diagram = await diagramService.getDiagramById(id);
-      if (!diagram) throw new Error("Diagram not found");
+      if (!diagram) throw gqlError(notFound("Resource not found"));
 
       return diagramService.deleteDiagram(id);
     },

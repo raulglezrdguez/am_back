@@ -7,6 +7,7 @@ import {
   isFutureDate,
   toUtcMidnight,
 } from "../services/utils.ts";
+import { badInput } from "../errors/appError.ts";
 
 const Schema = mongoose.Schema;
 const ObjectId = Schema.ObjectId;
@@ -52,7 +53,7 @@ const patientSchema = new Schema(
       set(v: string | Date) {
         if (!v) return v;
         if (v instanceof Date) {
-          if (isNaN(v.getTime())) throw new Error("Invalid birthDate format");
+          if (isNaN(v.getTime())) throw badInput("Invalid input");
           return toUtcMidnight(v);
         }
         if (typeof v === "string" && isValidBirthDateDMY(v)) {
@@ -60,7 +61,7 @@ const patientSchema = new Schema(
           // Construir directamente en UTC evita el desplazamiento de día
           return new Date(Date.UTC(y, m - 1, d));
         }
-        throw new Error("Invalid birthDate format");
+        throw badInput("Invalid input");
       },
     },
     sex: { type: String, enum: sexs, required: false },

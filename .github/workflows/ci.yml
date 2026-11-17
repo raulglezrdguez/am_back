@@ -82,6 +82,12 @@ jobs:
       - name: Integration tests
         run: npm run test:int
 
+      - name: Error contract tests
+        run: npm run test:int -- tests/integration/error.contract.test.ts
+
+      - name: Error unit tests
+        run: npm run test:unit -- tests/unit/errors tests/unit/middlewares/errorHandler.test.ts
+
       - name: Docker build
         run: docker build -t am-back:ci .
 

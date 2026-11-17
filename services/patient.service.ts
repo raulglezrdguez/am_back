@@ -18,6 +18,7 @@ import {
 } from "./utils.ts";
 import { phiSearchTruncatedTotal } from "../config/metrics.ts";
 import { logger } from "../middlewares/logger.ts";
+import { badInput, conflict, notFound } from "../errors/appError.ts";
 
 const USER_POPULATE = "id name email role status createdAt updatedAt";
 const PATIENT_POPULATES = [
@@ -289,7 +290,7 @@ export const updatePatient = async (
     .populate(PATIENT_POPULATES[1])
     .lean();
 
-  if (!patient) throw new Error("Patient not found or not owned by you");
+  if (!patient) throw notFound("Resource not found");
   return patient;
 };
 
@@ -305,7 +306,7 @@ export const deletePatient = async (id: string, ownerId: string) => {
     .populate(SHARED_POPULATE)
     .lean();
 
-  if (!patient) throw new Error("Patient not found or not owned by you");
+  if (!patient) throw notFound("Resource not found");
 
   const session = await mongoose.startSession();
   try {
@@ -313,10 +314,7 @@ export const deletePatient = async (id: string, ownerId: string) => {
       const statsCount = await Stat.countDocuments({ patient: id }).session(
         session,
       );
-      if (statsCount > 0)
-        throw new Error(
-          `Cannot delete patient: ${statsCount} statistics reference it.`,
-        );
+      if (statsCount > 0) throw conflict("Conflict");
 
       const patient = await Patient.findOneAndDelete({
         _id: id,
@@ -326,7 +324,7 @@ export const deletePatient = async (id: string, ownerId: string) => {
         .populate(OWNER_POPULATE)
         .populate(SHARED_POPULATE)
         .lean();
-      if (!patient) throw new Error("Patient not found or not owned by you");
+      if (!patient) throw notFound("Resource not found");
       return patient;
     });
     return deleted;
@@ -346,14 +344,14 @@ export const sharePatient = async (
     _id: id,
     owner: ownerId,
   });
-  if (!patient) throw new Error("Patient not found or not owned by you");
+  if (!patient) throw notFound("Resource not found");
 
   if (patient.owner.toString() === userId) {
-    throw new Error("Cannot share with yourself");
+    throw badInput("Invalid input");
   }
 
   const userExists = await User.exists({ _id: userId });
-  if (!userExists) throw new Error("User to share with not found");
+  if (!userExists) throw notFound("Resource not found");
 
   const updated = await Patient.findByIdAndUpdate(
     id,
@@ -378,7 +376,7 @@ export const deleteSharedPatient = async (
     _id: id,
     owner: ownerId,
   }).lean();
-  if (!patient) throw new Error("Patient not found or not owned by you");
+  if (!patient) throw notFound("Resource not found");
 
   return await Patient.findByIdAndUpdate(
     id,

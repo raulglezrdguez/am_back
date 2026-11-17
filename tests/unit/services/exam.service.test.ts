@@ -433,7 +433,7 @@ describe("ExamServise", () => {
 
     await expect(
       examService.updateExamExpression(`${exam._id}`, input),
-    ).rejects.toThrow("Expression not found in exam");
+    ).rejects.toThrow("Resource not found");
   });
 
   it("should throw error when creating expression for non-existing exam", async () => {
@@ -450,7 +450,7 @@ describe("ExamServise", () => {
 
     await expect(
       examService.createExamExpression(nonExistingExamId, input),
-    ).rejects.toThrow("Exam not found");
+    ).rejects.toThrow("Resource not found");
   });
 
   it("should throw error when updating expression for non-existing exam", async () => {
@@ -465,7 +465,7 @@ describe("ExamServise", () => {
 
     await expect(
       examService.updateExamExpression(nonExistingExamId, input),
-    ).rejects.toThrow("Exam not found");
+    ).rejects.toThrow("Resource not found");
   });
 
   it("should throw error when deleting expression for non-existing exam", async () => {
@@ -474,7 +474,7 @@ describe("ExamServise", () => {
 
     await expect(
       examService.deleteExamExpression(nonExistingExamId, expressionId),
-    ).rejects.toThrow("Exam not found");
+    ).rejects.toThrow("Resource not found");
   });
 
   it("should throw error when deleting non-existing exam expression", async () => {
@@ -507,7 +507,7 @@ describe("ExamServise", () => {
 
     await expect(
       examService.deleteExamExpression(`${exam._id}`, "nonExistingExpr"),
-    ).rejects.toThrow("Expression not found in exam");
+    ).rejects.toThrow("Resource not found");
   });
 
   it("should create exam question", async () => {
@@ -721,7 +721,7 @@ describe("ExamServise", () => {
 
     await expect(
       examService.updateExamQuestion(`${exam._id}`, input),
-    ).rejects.toThrow("Question not found in exam");
+    ).rejects.toThrow("Resource not found");
   });
 
   it("should throw error when creating question for non-existing exam", async () => {
@@ -746,7 +746,7 @@ describe("ExamServise", () => {
 
     await expect(
       examService.createExamQuestions(nonExistingExamId, input),
-    ).rejects.toThrow("Exam not found");
+    ).rejects.toThrow("Resource not found");
   });
 
   it("should throw error when updating question for non-existing exam", async () => {
@@ -769,7 +769,7 @@ describe("ExamServise", () => {
 
     await expect(
       examService.updateExamQuestion(nonExistingExamId, input),
-    ).rejects.toThrow("Exam not found");
+    ).rejects.toThrow("Resource not found");
   });
 
   it("should throw error when deleting question for non-existing exam", async () => {
@@ -778,7 +778,7 @@ describe("ExamServise", () => {
 
     await expect(
       examService.deleteExamQuestion(nonExistingExamId, questionId),
-    ).rejects.toThrow("Exam not found");
+    ).rejects.toThrow("Resource not found");
   });
 
   it("should throw error when deleting non-existing exam question", async () => {
@@ -819,7 +819,7 @@ describe("ExamServise", () => {
 
     await expect(
       examService.deleteExamQuestion(`${exam._id}`, "nonExistingQuest"),
-    ).rejects.toThrow("Question not found in exam");
+    ).rejects.toThrow("Resource not found");
   });
 
   it("should delete an exam", async () => {
@@ -856,7 +856,7 @@ describe("ExamServise", () => {
     const nonExistingExamId = new Types.ObjectId().toString();
 
     await expect(examService.deleteExam(nonExistingExamId)).rejects.toThrow(
-      "Exam not found",
+      "Resource not found",
     );
   });
 });

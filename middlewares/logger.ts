@@ -141,5 +141,20 @@ export function sanitizeError(err: unknown): Record<string, unknown> {
       .slice(0, 4000);
   }
 
+  if (e.name === "ValidationError" && e.errors) {
+    base.fields = Object.keys(e.errors).slice(0, 25);
+  }
+
+  if (e.name === "CastError" && typeof e.path === "string") {
+    base.field = e.path; // nombre del campo, nunca el valor
+  }
+
+  if (
+    (e.name === "MongoServerError" || e.name === "MongoBulkWriteError") &&
+    (e.code === 11000 || e.code === 11001)
+  ) {
+    base.message = "duplicate_key";
+  }
+
   return base;
 }

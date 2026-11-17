@@ -211,7 +211,7 @@ describe("PatientService", () => {
       PatientService.updatePatient(invalidId, user._id.toString(), {
         name: "New Name",
       }),
-    ).rejects.toThrow("Patient not found");
+    ).rejects.toThrow("Resource not found");
   });
 
   it("should delete a patient", async () => {

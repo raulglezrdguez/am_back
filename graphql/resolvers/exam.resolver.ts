@@ -6,6 +6,8 @@ import type {
   UpdateExamPropertiesInput,
 } from "../../types/exam.d.ts";
 import { type ApolloContext } from "../../config/apollo.context.ts";
+import { forbidden, notFound, unauthenticated } from "../../errors/appError.ts";
+import { gqlError } from "../authz.ts";
 
 export default {
   Query: {
@@ -28,7 +30,7 @@ export default {
       { input }: { input: CreateExamInput },
       { currentUser }: ApolloContext,
     ) => {
-      if (!currentUser) throw new Error("Authentication required");
+      if (!currentUser) throw gqlError(unauthenticated());
       const examInput = { ...input, author: currentUser.id };
       return examService.createExam(examInput);
     },
@@ -37,12 +39,12 @@ export default {
       { id, input }: { id: string; input: Partial<UpdateExamPropertiesInput> },
       { currentUser }: ApolloContext,
     ) => {
-      if (!currentUser) throw new Error("Authentication required");
+      if (!currentUser) throw gqlError(unauthenticated());
 
       const exam = await examService.getExamById(id, currentUser.id);
-      if (!exam) throw new Error("Exam not found");
+      if (!exam) throw gqlError(notFound("Resource not found"));
       if (exam.author._id.toString() !== currentUser.id)
-        throw new Error("Not authorized to update properties to this exam");
+        throw new Error("Not allowed");
 
       return examService.updateExamProperties(id, input);
     },
@@ -51,12 +53,12 @@ export default {
       { id, input }: { id: string; input: ExpressionInput[] },
       { currentUser }: ApolloContext,
     ) => {
-      if (!currentUser) throw new Error("Authentication required");
+      if (!currentUser) throw gqlError(unauthenticated());
 
       const exam = await examService.getExamById(id, currentUser.id);
-      if (!exam) throw new Error("Exam not found");
+      if (!exam) throw gqlError(notFound("Resource not found"));
       if (exam.author._id.toString() !== currentUser.id)
-        throw new Error("Not authorized to create expression to this exam");
+        throw gqlError(forbidden("Not allowed"));
 
       return examService.createExamExpression(id, input);
     },
@@ -65,12 +67,12 @@ export default {
       { id, input }: { id: string; input: ExpressionInput },
       { currentUser }: ApolloContext,
     ) => {
-      if (!currentUser) throw new Error("Authentication required");
+      if (!currentUser) throw gqlError(unauthenticated());
 
       const exam = await examService.getExamById(id, currentUser.id);
-      if (!exam) throw new Error("Exam not found");
+      if (!exam) throw gqlError(notFound("Resource not found"));
       if (exam.author._id.toString() !== currentUser.id)
-        throw new Error("Not authorized to update expression to this exam");
+        throw gqlError(forbidden("Not allowed"));
 
       return examService.updateExamExpression(id, input);
     },
@@ -79,12 +81,12 @@ export default {
       { id, expressionId }: { id: string; expressionId: string },
       { currentUser }: ApolloContext,
     ) => {
-      if (!currentUser) throw new Error("Authentication required");
+      if (!currentUser) throw gqlError(unauthenticated());
 
       const exam = await examService.getExamById(id, currentUser.id);
-      if (!exam) throw new Error("Exam not found");
+      if (!exam) throw gqlError(notFound("Resource not found"));
       if (exam.author._id.toString() !== currentUser.id)
-        throw new Error("Not authorized to delete expression from this exam");
+        throw gqlError(forbidden("Not allowed"));
 
       return examService.deleteExamExpression(id, expressionId);
     },
@@ -93,12 +95,12 @@ export default {
       { id, input }: { id: string; input: QuestionInput[] },
       { currentUser }: ApolloContext,
     ) => {
-      if (!currentUser) throw new Error("Authentication required");
+      if (!currentUser) throw gqlError(unauthenticated());
 
       const exam = await examService.getExamById(id, currentUser.id);
-      if (!exam) throw new Error("Exam not found");
+      if (!exam) throw gqlError(notFound("Resource not found"));
       if (exam.author._id.toString() !== currentUser.id)
-        throw new Error("Not authorized to create question to this exam");
+        throw gqlError(forbidden("Not allowed"));
 
       return examService.createExamQuestions(id, input);
     },
@@ -107,12 +109,12 @@ export default {
       { id, input }: { id: string; input: QuestionInput },
       { currentUser }: ApolloContext,
     ) => {
-      if (!currentUser) throw new Error("Authentication required");
+      if (!currentUser) throw gqlError(unauthenticated());
 
       const exam = await examService.getExamById(id, currentUser.id);
-      if (!exam) throw new Error("Exam not found");
+      if (!exam) throw gqlError(notFound("Resource not found"));
       if (exam.author._id.toString() !== currentUser.id)
-        throw new Error("Not authorized to update question to this exam");
+        throw gqlError(forbidden("Not allowed"));
 
       return examService.updateExamQuestion(id, input);
     },
@@ -125,12 +127,12 @@ export default {
       }: { id: string; questionId: string; input: QuestionInput },
       { currentUser }: ApolloContext,
     ) => {
-      if (!currentUser) throw new Error("Authentication required");
+      if (!currentUser) throw gqlError(unauthenticated());
 
       const exam = await examService.getExamById(id, currentUser.id);
-      if (!exam) throw new Error("Exam not found");
+      if (!exam) throw gqlError(notFound("Resource not found"));
       if (exam.author._id.toString() !== currentUser.id)
-        throw new Error("Not authorized to update question to this exam");
+        throw gqlError(forbidden("Not allowed"));
 
       return examService.updateExamQuestionId(id, questionId, input);
     },
@@ -139,12 +141,12 @@ export default {
       { id, questionId }: { id: string; questionId: string },
       { currentUser }: ApolloContext,
     ) => {
-      if (!currentUser) throw new Error("Authentication required");
+      if (!currentUser) throw gqlError(unauthenticated());
 
       const exam = await examService.getExamById(id, currentUser.id);
-      if (!exam) throw new Error("Exam not found");
+      if (!exam) throw gqlError(notFound("Resource not found"));
       if (exam.author._id.toString() !== currentUser.id)
-        throw new Error("Not authorized to delete question from this exam");
+        throw gqlError(forbidden("Not allowed"));
 
       return examService.deleteExamQuestion(id, questionId);
     },
@@ -153,12 +155,12 @@ export default {
       { id }: { id: string },
       { currentUser }: ApolloContext,
     ) => {
-      if (!currentUser) throw new Error("Authentication required");
+      if (!currentUser) throw gqlError(unauthenticated());
 
       const exam = await examService.getExamById(id, currentUser.id);
-      if (!exam) throw new Error("Exam not found");
+      if (!exam) throw gqlError(notFound("Resource not found"));
       if (exam.author._id.toString() !== currentUser.id)
-        throw new Error("Not authorized to delete this exam");
+        throw gqlError(forbidden("Not allowed"));
 
       return examService.deleteExam(id);
     },

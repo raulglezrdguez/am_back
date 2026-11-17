@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import User, { USER_ROLES, USER_STATUSES } from "../models/user.model.ts";
 import { UPDATE_OPTS } from "./utils.ts";
 import type { CreateUserInput } from "../types/user.d.ts";
+import { badInput, notFound } from "../errors/appError.ts";
 
 export const createUser = async (input: CreateUserInput) => {
   if (input.password) {
@@ -32,27 +33,25 @@ export const updateUser = async (
   }
 
   const user = await User.findByIdAndUpdate(id, patch, UPDATE_OPTS);
-  if (!user) throw new Error("User not found");
+  if (!user) throw notFound("Resource not found");
   return user;
 };
 
 export const updateUserRole = async (id: string, role: number) => {
   if (!USER_ROLES.includes(role as any)) {
-    throw new Error(`Invalid role: ${role}. Allowed: ${USER_ROLES.join(", ")}`);
+    throw badInput("Invalid input");
   }
   const user = await User.findByIdAndUpdate(id, { role }, UPDATE_OPTS);
-  if (!user) throw new Error("User not found");
+  if (!user) throw notFound("Resource not found");
   return user;
 };
 
 export const updateUserStatus = async (id: string, status: number) => {
   if (!USER_STATUSES.includes(status as any)) {
-    throw new Error(
-      `Invalid status: ${status}. Allowed: ${USER_STATUSES.join(", ")}`,
-    );
+    throw badInput("Invalid input");
   }
   const user = await User.findByIdAndUpdate(id, { status }, UPDATE_OPTS);
-  if (!user) throw new Error("User not found");
+  if (!user) throw notFound("Resource not found");
   return user;
 };
 

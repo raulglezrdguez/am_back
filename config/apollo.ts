@@ -15,6 +15,7 @@ import { resolvers } from "../graphql/resolvers/index.ts";
 import { type ApolloContext } from "./apollo.context.ts";
 import { IS_PRODUCTION } from "./index.ts";
 import { observabilityPlugin } from "../graphql/plugins/observability.plugin.ts";
+import { formatGraphQLError } from "../errors/graphqlErrors.ts";
 
 const MAX_DEPTH = 8; // recomendado 7-10
 const MAX_COMPLEXITY = 1000; // puntos de costo por query
@@ -101,36 +102,17 @@ export function createApolloServer(httpServer: any) {
       },
       observabilityPlugin,
     ],
-    formatError: (formattedError) => {
-      const code = String(
-        formattedError.extensions?.code ?? "INTERNAL_SERVER_ERROR",
-      );
-
-      if (!IS_PRODUCTION) return formattedError;
-
-      const safeMessages: Record<string, string> = {
-        UNAUTHENTICATED: "Authentication required",
-        FORBIDDEN: "Not allowed",
-        NOT_FOUND: "Resource not found",
-        BAD_USER_INPUT: "Invalid input",
-        CONFLICT: "Conflict",
-        TOO_MANY_REQUESTS: "Too many requests",
-        UNPROCESSABLE_ENTITY: "Invalid input",
-        GRAPHQL_VALIDATION_FAILED: "Invalid query",
-        COMPLEXITY_LIMIT_EXCEEDED: "Query too complex",
-        RATE_LIMITED: "Too many requests",
-        SERVICE_UNAVAILABLE: "Service temporarily unavailable",
-      };
-
-      return {
-        message: safeMessages[code] ?? "Internal server error",
-        locations: formattedError.locations,
-        path: formattedError.path,
-        extensions: {
-          code,
-          requestId: formattedError.extensions?.requestId,
-        },
-      };
-    },
+    formatError: (formattedError, originalError) =>
+      formatGraphQLError(formattedError, originalError, {
+        isProduction: IS_PRODUCTION,
+        requestId:
+          typeof formattedError.extensions?.requestId === "string"
+            ? formattedError.extensions.requestId
+            : undefined,
+        errorId:
+          typeof formattedError.extensions?.errorId === "string"
+            ? formattedError.extensions.errorId
+            : undefined,
+      }),
   });
 }

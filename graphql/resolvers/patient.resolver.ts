@@ -6,6 +6,8 @@ import type {
 } from "../../types/patient.d.ts";
 import { type ApolloContext } from "../../config/apollo.context.ts";
 import { GraphQLError } from "graphql";
+import { forbidden, notFound, unauthenticated } from "../../errors/appError.ts";
+import { gqlError } from "../authz.ts";
 
 const SEARCH_TERM_MAX = 64;
 
@@ -107,7 +109,7 @@ const Mutation = {
     { input }: { input: CreatePatientInput },
     { currentUser }: ApolloContext,
   ) => {
-    if (!currentUser) throw new Error("Authentication required");
+    if (!currentUser) throw gqlError(unauthenticated());
     const patientInput = { ...input, owner: currentUser.id };
     return patientService.createPatient(patientInput);
   },
@@ -116,13 +118,13 @@ const Mutation = {
     { id, input }: { id: string; input: Partial<UpdatePatientInput> },
     { currentUser }: ApolloContext,
   ) => {
-    if (!currentUser) throw new Error("Authentication required");
+    if (!currentUser) throw gqlError(unauthenticated());
     const patient = await patientService.getPatient(id, currentUser.id);
-    if (!patient) throw new Error("Patient not found");
+    if (!patient) throw gqlError(notFound("Resource not found"));
     const ownerId =
       (patient.owner as any)._id?.toString() ?? patient.owner.toString();
     if (ownerId !== currentUser.id) {
-      throw new Error("Only the owner can update this patient");
+      throw gqlError(forbidden("Not allowed"));
     }
     return patientService.updatePatient(id, currentUser.id, input);
   },
@@ -131,13 +133,13 @@ const Mutation = {
     { id }: { id: string },
     { currentUser }: ApolloContext,
   ) => {
-    if (!currentUser) throw new Error("Authentication required");
+    if (!currentUser) throw gqlError(unauthenticated());
     const patient = await patientService.getPatient(id, currentUser.id);
-    if (!patient) throw new Error("Patient not found");
+    if (!patient) throw gqlError(notFound("Resource not found"));
     const ownerId =
       (patient.owner as any)._id?.toString() ?? patient.owner.toString();
     if (ownerId !== currentUser.id) {
-      throw new Error("Only the owner can delete this patient");
+      throw gqlError(forbidden("Not allowed"));
     }
     return patientService.deletePatient(id, currentUser.id);
   },
@@ -146,7 +148,7 @@ const Mutation = {
     { id, userId }: { id: string; userId: string },
     { currentUser }: ApolloContext,
   ) => {
-    if (!currentUser) throw new Error("Authentication required");
+    if (!currentUser) throw gqlError(unauthenticated());
     return patientService.sharePatient(id, currentUser.id, userId);
   },
   deleteSharedPatient: async (
@@ -154,7 +156,7 @@ const Mutation = {
     { id, userId }: { id: string; userId: string },
     { currentUser }: ApolloContext,
   ) => {
-    if (!currentUser) throw new Error("Authentication required");
+    if (!currentUser) throw gqlError(unauthenticated());
     return patientService.deleteSharedPatient(id, currentUser.id, userId);
   },
 };

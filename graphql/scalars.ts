@@ -24,6 +24,16 @@ export const BIRTHDATE_REGEX = {
   test: (value: string) => isValidBirthDateDMY(value),
 };
 
+const invalidInput = (message: string) =>
+  new GraphQLError(message, {
+    extensions: { code: "BAD_USER_INPUT" as const },
+  });
+
+const internalError = () =>
+  new GraphQLError("Internal server error", {
+    extensions: { code: "INTERNAL_SERVER_ERROR" as const },
+  });
+
 // Date scalar type
 export const DateScalar = new GraphQLScalarType({
   name: "Date",
@@ -35,27 +45,27 @@ export const DateScalar = new GraphQLScalarType({
     if (typeof value === "string" || typeof value === "number") {
       return new Date(value).toISOString();
     }
-    throw new GraphQLError("Value must be a Date, string, or number");
+    throw internalError();
   },
   parseValue(value: unknown): Date {
     if (typeof value === "string" || typeof value === "number") {
       const date = new Date(value);
       if (isNaN(date.getTime())) {
-        throw new GraphQLError("Invalid date format");
+        throw invalidInput("Invalid date format");
       }
       return date;
     }
-    throw new GraphQLError("Value must be a string or number");
+    throw invalidInput("Value must be a string or number");
   },
   parseLiteral(ast): Date {
     if (ast.kind === Kind.STRING || ast.kind === Kind.INT) {
       const date = new Date(ast.value);
       if (isNaN(date.getTime())) {
-        throw new GraphQLError("Invalid date format");
+        throw invalidInput("Invalid date format");
       }
       return date;
     }
-    throw new GraphQLError("Value must be a string or number");
+    throw invalidInput("Value must be a string or number");
   },
 });
 
@@ -98,9 +108,7 @@ export const JSONScalar = new GraphQLScalarType({
         case Kind.LIST:
           return valueAst.values.map((value: any) => parseLiteralValue(value));
         default:
-          throw new GraphQLError(
-            `Unexpected kind in JSON literal: ${valueAst.kind}`,
-          );
+          throw invalidInput("Invalid JSON literal");
       }
     };
 
@@ -120,7 +128,7 @@ export const StringBooleanNumberScalar = new GraphQLScalarType({
     ) {
       return value.toString();
     }
-    throw new GraphQLError("Value must be a string, boolean or number");
+    throw invalidInput("Value must be a string, boolean or number");
   },
   parseValue(value: unknown): string {
     if (
@@ -130,7 +138,7 @@ export const StringBooleanNumberScalar = new GraphQLScalarType({
     ) {
       return value.toString();
     }
-    throw new GraphQLError("Value must be a string, boolean or number");
+    throw invalidInput("Value must be a string, boolean or number");
   },
   parseLiteral(ast): string {
     if (
@@ -141,7 +149,7 @@ export const StringBooleanNumberScalar = new GraphQLScalarType({
     ) {
       return ast.value.toString();
     }
-    throw new GraphQLError("Value must be a string, boolean or number");
+    throw invalidInput("Value must be a string, boolean or number");
   },
 });
 
@@ -155,7 +163,7 @@ export const BirthDateScalar = new GraphQLScalarType({
       const date = new Date(value);
       if (!isNaN(date.getTime())) return formatBirthDate(date);
     }
-    throw new TypeError("BirthDate can only serialize Date instances");
+    throw internalError();
   },
   parseValue(value) {
     if (typeof value !== "string" || !isValidBirthDateDMY(value)) {

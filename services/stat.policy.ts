@@ -1,6 +1,8 @@
-export class NotFoundError extends Error {
+import { AppError } from "../errors/appError.ts";
+
+export class NotFoundError extends AppError {
   constructor(message = "Resource not found") {
-    super(message);
+    super("NOT_FOUND", message);
     this.name = "NotFoundError";
   }
 }

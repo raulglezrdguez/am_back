@@ -21,6 +21,8 @@ import {
   buildAuthorScope,
   type StatActor,
 } from "./stat.policy.ts";
+import { gqlError } from "../graphql/authz.ts";
+import { notFound } from "../errors/appError.ts";
 
 // Proyección mínima del examen: NO traer questions/expression
 const populateExamMinimal = {
@@ -170,7 +172,7 @@ export const createStat = async (input: CreateStatInput, actor: StatActor) => {
   // Refuerzo: el authorId debe ser el del actor (o admin puede crear en nombre de otro si lo permites).
   if (!actor || (actor.role !== 0 && input.authorId !== actor.id)) {
     // Si prefieres que admin pueda crear para otros, quita esta rama.
-    throw new NotFoundError("Stat not found");
+    throw gqlError(notFound("Resource not found"));
   }
 
   const session = await mongoose.startSession();
@@ -189,7 +191,7 @@ export const createStat = async (input: CreateStatInput, actor: StatActor) => {
       const patient = await Patient.findOne(patientFilter)
         .session(session)
         .lean();
-      if (!patient) throw new NotFoundError("Patient not found");
+      if (!patient) throw gqlError(notFound("Resource not found"));
 
       // El examen debe existir y ser accesible (público o del actor)
       const examFilter =
@@ -200,7 +202,7 @@ export const createStat = async (input: CreateStatInput, actor: StatActor) => {
               $or: [{ public: true }, { author: actor.id }],
             };
       const exam = await Exam.findOne(examFilter).session(session).lean();
-      if (!exam) throw new NotFoundError("Exam not found");
+      if (!exam) throw gqlError(notFound("Resource not found"));
 
       const [doc] = await Stat.create(
         [
@@ -231,7 +233,7 @@ export const createStat = async (input: CreateStatInput, actor: StatActor) => {
         .populate(populateAuthorFull)
         .lean();
     });
-    if (!created) throw new NotFoundError("Stat not found");
+    if (!created) throw gqlError(notFound("Resource not found"));
     return created;
   } finally {
     await session.endSession();

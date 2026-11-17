@@ -11,6 +11,7 @@ import {
   writeAuditEvent,
   type AuditContext,
 } from "../services/audit.service.ts";
+import { serviceUnavailable } from "../errors/appError.ts";
 
 const auditContext = (req: Request): AuditContext => ({
   requestId: req.id,
@@ -30,43 +31,44 @@ const auditAuth = (
   );
 };
 
-// Verifica el token contra la base de datos local
+// verifyLocalUser: separar JWT de Mongo
 const verifyLocalUser = async (token: string, req: any) => {
+  if (!JWT_SECRET) {
+    throw new Error("JWT_SECRET missing — this should have failed at startup");
+  }
+
+  let decoded: JwtPayload;
   try {
-    if (!JWT_SECRET) {
-      throw new Error(
-        "JWT_SECRET missing — this should have failed at startup",
-      );
-    }
+    decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+  } catch (error: any) {
+    logger.debug({ err: sanitizeError(error) }, "jwt_verification_failed");
+    req.user = null;
+    return; // token inválido/exprimido: anónimo, no error de servidor
+  }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+  // Si Mongo falla aquí, NO lo conviertas en anónimo.
+  const dbUser = await User.findOne({
+    _id: decoded.id,
+    email: decoded.email,
+    status: 1,
+  }).lean();
 
-    const dbUser = await User.findOne({
-      _id: decoded.id,
-      email: decoded.email,
-      status: 1,
-    }).lean();
-    if (dbUser) {
-      req.user = {
+  req.user = dbUser
+    ? {
         id: dbUser._id.toString(),
         name: dbUser.name,
         email: dbUser.email,
         role: dbUser.role,
         status: dbUser.status,
-      };
-    } else {
-      req.user = null;
-    }
-  } catch (error: any) {
-    logger.debug({ err: sanitizeError(error) }, "jwt_verification_failed");
-    req.user = null;
-  }
+      }
+    : null;
 };
 
 type FirebaseFailureReason =
   | "TOKEN_REVOKED"
   | "SESSION_COOKIE_REVOKED"
-  | "INVALID_TOKEN";
+  | "INVALID_TOKEN"
+  | "AUTH_BACKEND_UNAVAILABLE";
 
 type FirebaseTokenResult =
   | {
@@ -79,6 +81,9 @@ type FirebaseTokenResult =
       reason: FirebaseFailureReason;
       tokenType: "id_token" | "session_cookie";
     };
+
+const isAuthTokenError = (code: unknown) =>
+  typeof code === "string" && code.startsWith("auth/");
 
 const verifyFirebaseToken = async (
   token: string,
@@ -98,6 +103,14 @@ const verifyFirebaseToken = async (
       const user = await adminFirebase.auth().verifySessionCookie(token, true);
       return { user, tokenType: "session_cookie" };
     } catch (sessionError: any) {
+      if (!isAuthTokenError(sessionError?.code)) {
+        return {
+          user: null,
+          reason: "AUTH_BACKEND_UNAVAILABLE",
+          tokenType: "session_cookie",
+        };
+      }
+
       return {
         user: null,
         reason:
@@ -147,6 +160,18 @@ export async function authMiddleware(
 
     // Verificar token de Firebase si es un token de Firebase
     const firebaseResult = await verifyFirebaseToken(token);
+
+    if (firebaseResult.reason === "AUTH_BACKEND_UNAVAILABLE") {
+      auditAuth(req, {
+        operation: "auth.unexpected",
+        operationType: "system",
+        resourceType: "Auth",
+        result: "error",
+        reason: "AUTH_BACKEND_UNAVAILABLE",
+        metadata: { method: "firebase" },
+      });
+      return next(serviceUnavailable("Service temporarily unavailable"));
+    }
 
     if (!firebaseResult.user) {
       // Un único evento, con el motivo específico del fallo.
@@ -240,9 +265,7 @@ export async function authMiddleware(
 
     next();
   } catch (err) {
-    // Red de seguridad: solo debería llegarse aquí por un fallo inesperado
-    // (Mongo caído, etc.), no por un token inválido.
-    logger.debug({ err: sanitizeError(err) }, "auth_unexpected_failure");
+    logger.error({ err: sanitizeError(err) }, "auth_unexpected_failure");
     auditAuth(req, {
       operation: "auth.unexpected",
       operationType: "system",
@@ -251,7 +274,6 @@ export async function authMiddleware(
       reason: "AUTH_PIPELINE_ERROR",
       metadata: { method: "unknown" },
     });
-    req.user = null; // fallo inesperado → anónimo (fail-closed aguas abajo)
-    next();
+    return next(serviceUnavailable("Service temporarily unavailable"));
   }
 }

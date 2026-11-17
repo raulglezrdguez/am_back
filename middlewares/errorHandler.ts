@@ -1,25 +1,32 @@
+import { randomUUID } from "node:crypto";
 import { sanitizeError } from "./logger.ts";
+import { classifyHttpError } from "../errors/httpErrors.ts";
 
 export function errorHandler(err: any, req: any, res: any, next: any) {
   if (res.headersSent) return next(err);
 
-  const statusCode = Number(err?.statusCode) || 500;
-  const safeMessage = err?.isOperational
-    ? String(err.message).slice(0, 300)
-    : "Internal server error";
+  const info = classifyHttpError(err);
+  const errorId = randomUUID();
 
-  req.log?.error(
-    {
-      err: sanitizeError(err),
-      statusCode,
-      requestId: req.id,
-      userId: req.user?.id ?? null,
-    },
-    "request_failed",
-  );
-
-  return res.status(statusCode).send({
-    error: safeMessage,
+  const payload = {
+    err: sanitizeError(err),
+    statusCode: info.statusCode,
+    code: info.code,
     requestId: req.id,
+    errorId,
+    userId: req.user?.id ?? null,
+  };
+
+  if (info.statusCode >= 500) {
+    req.log?.error(payload, "request_failed");
+  } else {
+    req.log?.warn(payload, "request_failed");
+  }
+
+  return res.status(info.statusCode).send({
+    error: info.message,
+    code: info.code,
+    requestId: req.id,
+    errorId,
   });
 }

@@ -726,7 +726,7 @@ describe("Diagram Resolvers", () => {
 
       expect(response.status).toBe(200);
       expect(response.body.errors).toBeDefined();
-      expect(response.body.errors[0].message).toBe("Diagram not found");
+      expect(response.body.errors[0].message).toBe("Resource not found");
     });
 
     it("fails to delete diagram when user is not the author", async () => {
@@ -778,9 +778,7 @@ describe("Diagram Resolvers", () => {
 
       expect(response.status).toBe(200);
       expect(response.body.errors).toBeDefined();
-      expect(response.body.errors[0].message).toBe(
-        "Not authorized to delete this diagram",
-      );
+      expect(response.body.errors[0].message).toBe("Not allowed");
     });
   });
 });

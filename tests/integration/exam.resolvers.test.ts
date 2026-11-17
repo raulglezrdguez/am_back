@@ -465,7 +465,7 @@ describe("Exam GraphQL", () => {
       .send(gql(mutation))
       .expect(200);
     expect(res.body.errors).toBeDefined();
-    expect(res.body.errors[0].message).toBe("Exam not found");
+    expect(res.body.errors[0].message).toBe("Resource not found");
   });
 
   it("updateExamProperties mutation (without token) → returns error", async () => {
@@ -628,7 +628,7 @@ describe("Exam GraphQL", () => {
       .send(gql(mutation))
       .expect(200);
     expect(res.body.errors).toBeDefined();
-    expect(res.body.errors[0].message).toBe("Exam not found");
+    expect(res.body.errors[0].message).toBe("Resource not found");
   });
 
   it("createExamExpression mutation (without token) → returns error", async () => {
@@ -813,7 +813,7 @@ describe("Exam GraphQL", () => {
       .send(gql(mutation))
       .expect(200);
     expect(res.body.errors).toBeDefined();
-    expect(res.body.errors[0].message).toBe("Exam not found");
+    expect(res.body.errors[0].message).toBe("Resource not found");
   });
 
   it("updateExamExpression mutation (without token) → returns error", async () => {
@@ -1045,9 +1045,7 @@ describe("Exam GraphQL", () => {
       .send(gql(mutation))
       .expect(200);
     expect(res.body.errors).toBeDefined();
-    expect(res.body.errors[0].message).toBe(
-      "Not authorized to create question to this exam",
-    );
+    expect(res.body.errors[0].message).toBe("Not allowed");
   });
 
   it("createExamQuestion mutation (without token) → returns error", async () => {
@@ -1312,9 +1310,7 @@ describe("Exam GraphQL", () => {
       .send(gql(mutation))
       .expect(200);
     expect(res.body.errors).toBeDefined();
-    expect(res.body.errors[0].message).toBe(
-      "Not authorized to update question to this exam",
-    );
+    expect(res.body.errors[0].message).toBe("Not allowed");
   });
 
   it("updateExamQuestion mutation (without token) → returns error", async () => {
@@ -1531,9 +1527,7 @@ describe("Exam GraphQL", () => {
       .send(gql(mutation))
       .expect(200);
     expect(res.body.errors).toBeDefined();
-    expect(res.body.errors[0].message).toBe(
-      "Not authorized to delete question from this exam",
-    );
+    expect(res.body.errors[0].message).toBe("Not allowed");
   });
 
   it("deleteExamQuestion mutation (without token) → returns error", async () => {
@@ -1687,9 +1681,7 @@ describe("Exam GraphQL", () => {
       .send(gql(mutation))
       .expect(200);
     expect(res.body.errors).toBeDefined();
-    expect(res.body.errors[0].message).toBe(
-      "Not authorized to delete this exam",
-    );
+    expect(res.body.errors[0].message).toBe("Not allowed");
   });
 
   it("deleteExam mutation (without token) → returns error", async () => {

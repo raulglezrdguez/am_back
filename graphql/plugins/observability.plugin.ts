@@ -2,22 +2,15 @@ import type { ApolloServerPlugin } from "@apollo/server";
 import { GraphQLError, type FieldNode } from "graphql";
 import * as Sentry from "@sentry/node";
 import type { ApolloContext } from "../../config/apollo.context.ts";
-import { logger } from "../../middlewares/logger.ts";
+import { logger, sanitizeError } from "../../middlewares/logger.ts";
 import {
   graphqlErrorsTotal,
   graphqlOperationDuration,
   graphqlOperationsTotal,
 } from "../../config/metrics.ts";
-
-const EXPECTED_CODES = new Set([
-  "UNAUTHENTICATED",
-  "NOT_FOUND",
-  "BAD_USER_INPUT",
-  "GRAPHQL_VALIDATION_FAILED",
-  "COMPLEXITY_LIMIT_EXCEEDED",
-  "RATE_LIMITED",
-  "SERVICE_UNAVAILABLE",
-]);
+import { isExpectedCode } from "../../errors/errorCatalog.ts";
+import { randomUUID } from "node:crypto";
+import { classifyError } from "../../errors/graphqlErrors.ts";
 
 const firstFieldName = (operation: any): string => {
   const selection = operation?.selectionSet?.selections?.find(
@@ -50,35 +43,52 @@ export const observabilityPlugin: ApolloServerPlugin<ApolloContext> = {
 
       async didEncounterErrors({ errors }) {
         for (const err of errors) {
-          const code = String(err.extensions?.code ?? "INTERNAL_SERVER_ERROR");
+          const classified = classifyError(err.originalError ?? err);
+          const code = classified.code;
+          const errorId = randomUUID();
 
           (err as any).extensions = {
             ...(err.extensions ?? {}),
             requestId: contextValue.requestId,
+            errorId,
           };
 
-          graphqlErrorsTotal.inc({
+          graphqlErrorsTotal.inc({ code, operation: metricOperation });
+
+          const payload = {
+            requestId: contextValue.requestId,
+            errorId,
             code,
             operation: metricOperation,
-          });
+            path: err.path,
+            errorName: (err.originalError as any)?.name ?? err.name,
+            err: sanitizeError(err.originalError ?? err),
+          };
 
-          if (!EXPECTED_CODES.has(code) && Sentry.getClient()) {
-            // No enviar el mensaje original: puede contener PHI.
+          if (
+            code === "INTERNAL_SERVER_ERROR" ||
+            code === "SERVICE_UNAVAILABLE"
+          ) {
+            (contextValue.logger ?? logger).error(payload, "graphql_error");
+          } else if (code === "UNAUTHENTICATED" || code === "FORBIDDEN") {
+            (contextValue.logger ?? logger).debug(payload, "graphql_error");
+          } else {
+            (contextValue.logger ?? logger).warn(payload, "graphql_error");
+          }
+
+          if (!isExpectedCode(code) && Sentry.getClient()) {
             const safeError = new Error(code);
-            safeError.name = err.name ?? "GraphQLError";
-            // NO copiar err.stack: la primera línea es "Error: <mensaje>"
-            // y puede contener PHI. El stack de safeError apunta al plugin,
-            // que es información suficiente para agrupar el error.
+            safeError.name =
+              (err.originalError as any)?.name ?? err.name ?? "GraphQLError";
 
             Sentry.captureException(safeError, {
               tags: {
                 requestId: contextValue.requestId,
-                operation: metricOperation,
+                errorId,
                 code,
+                operation: metricOperation,
               },
-              user: contextValue.currentUser
-                ? { id: contextValue.currentUser.id }
-                : undefined,
+              fingerprint: [code, metricOperation],
             });
           }
         }
@@ -88,9 +98,8 @@ export const observabilityPlugin: ApolloServerPlugin<ApolloContext> = {
         const durationMs = performance.now() - startedAt;
         const result = errors?.length ? "error" : "success";
         const errorCodes =
-          errors?.map((err) =>
-            String(err.extensions?.code ?? "INTERNAL_SERVER_ERROR"),
-          ) ?? [];
+          errors?.map((err) => classifyError(err.originalError ?? err).code) ??
+          [];
 
         (contextValue.logger ?? logger).info(
           {

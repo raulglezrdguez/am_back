@@ -15,6 +15,7 @@ import {
   type CursorPage,
 } from "./utils.ts";
 import { loadPopulated } from "./load.ts";
+import { conflict, notFound } from "../errors/appError.ts";
 
 const EXAM_LIST_PROJECTION =
   "_id title subtitle instructions description author year public createdAt";
@@ -109,7 +110,7 @@ export const updateExamProperties = async (
   const exam = await Exam.findByIdAndUpdate(id, input, UPDATE_OPTS).populate(
     EXAM_POPULATES[0],
   );
-  if (!exam || exam.deletedAt) throw new Error("Exam not found");
+  if (!exam || exam.deletedAt) throw notFound("Resource not found");
   return exam.toObject({ virtuals: true });
 };
 
@@ -119,7 +120,7 @@ export const createExamExpression = async (
   input: ExpressionInput[],
 ) => {
   const exam = await Exam.findById(id);
-  if (!exam || exam.deletedAt) throw new Error("Exam not found");
+  if (!exam || exam.deletedAt) throw notFound("Resource not found");
 
   exam.expression?.push(...input);
 
@@ -134,10 +135,10 @@ export const updateExamExpression = async (
   input: ExpressionInput,
 ) => {
   const exam = await Exam.findById(id);
-  if (!exam || exam.deletedAt) throw new Error("Exam not found");
+  if (!exam || exam.deletedAt) throw notFound("Resource not found");
 
   const expression = exam.expression?.find((expr) => expr.id === input.id);
-  if (!expression) throw new Error("Expression not found in exam");
+  if (!expression) throw notFound("Resource not found");
 
   expression.operator = input.operator;
   expression.value = input.value;
@@ -156,11 +157,10 @@ export const deleteExamExpression = async (
   expressionId: string,
 ) => {
   const exam = await Exam.findById(id);
-  if (!exam || exam.deletedAt) throw new Error("Exam not found");
+  if (!exam || exam.deletedAt) throw notFound("Resource not found");
 
   const index = exam.expression?.findIndex((expr) => expr.id === expressionId);
-  if (index === -1 || index === undefined)
-    throw new Error("Expression not found in exam");
+  if (index === -1 || index === undefined) throw notFound("Resource not found");
 
   exam.expression?.splice(index, 1);
 
@@ -175,7 +175,7 @@ export const createExamQuestions = async (
   input: QuestionInput[],
 ) => {
   const exam = await Exam.findById(id);
-  if (!exam || exam.deletedAt) throw new Error("Exam not found");
+  if (!exam || exam.deletedAt) throw notFound("Resource not found");
 
   exam.questions?.push(...input);
 
@@ -187,10 +187,10 @@ export const createExamQuestions = async (
 // update exam question
 export const updateExamQuestion = async (id: string, input: QuestionInput) => {
   const exam = await Exam.findById(id);
-  if (!exam || exam.deletedAt) throw new Error("Exam not found");
+  if (!exam || exam.deletedAt) throw notFound("Resource not found");
 
   const question = exam.questions?.find((quest) => quest.id === input.id);
-  if (!question) throw new Error("Question not found in exam");
+  if (!question) throw notFound("Resource not found");
 
   question.id = input.id;
   question.text = input.text;
@@ -217,10 +217,10 @@ export const updateExamQuestionId = async (
   input: QuestionInput,
 ) => {
   const exam = await Exam.findById(id);
-  if (!exam || exam.deletedAt) throw new Error("Exam not found");
+  if (!exam || exam.deletedAt) throw notFound("Resource not found");
 
   const question = exam.questions?.find((quest) => quest.id === questionId);
-  if (!question) throw new Error("Question not found in exam");
+  if (!question) throw notFound("Resource not found");
 
   question.id = input.id;
   question.text = input.text;
@@ -245,11 +245,10 @@ export const updateExamQuestionId = async (
 // delete exam question
 export const deleteExamQuestion = async (id: string, questionId: string) => {
   const exam = await Exam.findById(id);
-  if (!exam || exam.deletedAt) throw new Error("Exam not found");
+  if (!exam || exam.deletedAt) throw notFound("Resource not found");
 
   const index = exam.questions?.findIndex((quest) => quest.id === questionId);
-  if (index === -1 || index === undefined)
-    throw new Error("Question not found in exam");
+  if (index === -1 || index === undefined) throw notFound("Resource not found");
 
   exam.questions?.splice(index, 1);
 
@@ -262,13 +261,11 @@ export const deleteExamQuestion = async (id: string, questionId: string) => {
 export const deleteExam = async (id: string) => {
   const statsCount = await Stat.countDocuments({ exam: id });
   if (statsCount > 0) {
-    throw new Error(
-      `Cannot delete exam: ${statsCount} statistics reference it.`,
-    );
+    throw conflict("Conflict");
   }
 
   const exam = await Exam.findByIdAndDelete(id).populate(EXAM_POPULATES[0]);
-  if (!exam) throw new Error("Exam not found");
+  if (!exam) throw notFound("Resource not found");
 
   return exam.toObject({ virtuals: true });
 };

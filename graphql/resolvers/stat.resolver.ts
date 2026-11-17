@@ -5,14 +5,11 @@ import type { CreateStatInput, StatFilterInput } from "../../types/stat.d.ts";
 
 import { type ApolloContext } from "../../config/apollo.context.ts";
 import { NotFoundError } from "../../services/stat.policy.ts";
+import { unauthenticated } from "../../errors/appError.ts";
+import { gqlError } from "../authz.ts";
 
 export const toActor = (currentUser: ApolloContext["currentUser"]) => {
-  if (!currentUser) {
-    // Usa GraphQLError con extensions.code
-    throw new GraphQLError("Authentication required", {
-      extensions: { code: "UNAUTHENTICATED" },
-    });
-  }
+  if (!currentUser) throw gqlError(unauthenticated());
   return { id: currentUser.id, role: currentUser.role };
 };
 
@@ -21,10 +18,7 @@ const wrap = async <T>(fn: () => Promise<T>): Promise<T> => {
     return await fn();
   } catch (err) {
     if (err instanceof NotFoundError) {
-      // Usa GraphQLError con extensions.code
-      throw new GraphQLError(err.message, {
-        extensions: { code: "NOT_FOUND" },
-      });
+      throw gqlError(err); // NotFoundError extends AppError
     }
     throw err;
   }

@@ -555,7 +555,7 @@ describe("Patient Resolvers", () => {
         .expect(200);
 
       expect(res.body.errors).toBeDefined();
-      expect(res.body.errors[0].message).toBe("Patient not found");
+      expect(res.body.errors[0].message).toBe("Resource not found");
       expect(res.body.data.updatePatient).toBeNull();
     });
   });
@@ -673,7 +673,7 @@ describe("Patient Resolvers", () => {
         .expect(200);
 
       expect(res.body.errors).toBeDefined();
-      expect(res.body.errors[0].message).toBe("Patient not found");
+      expect(res.body.errors[0].message).toBe("Resource not found");
       expect(res.body.data).toBeNull();
     });
   });

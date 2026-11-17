@@ -9,6 +9,7 @@ import {
 } from "../services/audit.service.ts";
 import { phiSearchResults } from "../config/metrics.ts";
 import { assertOperationQuota } from "./operationLimit.ts";
+import { isErrorCode } from "../errors/errorCatalog.ts";
 
 type Resolver = (
   parent: any,
@@ -35,9 +36,14 @@ const firstId = (...values: unknown[]): string | null => {
 };
 
 const errorCode = (err: unknown): string => {
+  const code = (err as any)?.code;
+  if (isErrorCode(code)) return code;
+
   if (err instanceof GraphQLError) {
-    return String(err.extensions?.code ?? "GRAPHQL_ERROR");
+    const gqlCode = err.extensions?.code;
+    if (isErrorCode(gqlCode)) return gqlCode;
   }
+
   const name = (err as any)?.name;
   if (name === "NotFoundError") return "NOT_FOUND";
   if (name === "AuditUnavailableError") return "SERVICE_UNAVAILABLE";
@@ -45,18 +51,20 @@ const errorCode = (err: unknown): string => {
   return "INTERNAL_ERROR";
 };
 
-const resultStatus = (ctx: ApolloContext, result: any) => {
-  if (!ctx.currentUser) return "denied" as const;
-  if (result === null || result === undefined) return "not_found" as const;
-  return "success" as const;
-};
-
 const errorStatus = (ctx: ApolloContext, err: unknown) => {
   if (!ctx.currentUser) return "denied" as const;
   const code = errorCode(err);
   if (code === "NOT_FOUND") return "not_found" as const;
+  if (code === "UNAUTHENTICATED" || code === "FORBIDDEN")
+    return "denied" as const;
   if (code === "RATE_LIMITED") return "denied" as const;
   return "error" as const;
+};
+
+const resultStatus = (ctx: ApolloContext, result: any) => {
+  if (!ctx.currentUser) return "denied" as const;
+  if (result === null || result === undefined) return "not_found" as const;
+  return "success" as const;
 };
 
 const auditContext = (ctx: ApolloContext) => ({

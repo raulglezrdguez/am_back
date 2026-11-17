@@ -2,15 +2,18 @@ import { asAuditId, auditResolvers } from "../audit.ts";
 import { type ApolloContext } from "../../config/apollo.context.ts";
 import * as userService from "../../services/user.service.ts";
 import type { CreateUserInput, UpdateUserInput } from "../../types/user.d.ts";
+import { unauthenticated } from "../../errors/appError.ts";
+import { gqlError } from "../authz.ts";
+import { GraphQLError } from "graphql";
 
 const Query = {
   users: (_: any, __: any, { currentUser }: ApolloContext) => {
-    if (!currentUser) throw new Error("Authentication required");
+    if (!currentUser) throw gqlError(unauthenticated());
     if (currentUser?.role === 0) return userService.listUsers();
     return [];
   },
   user: (_: any, { id }: { id: string }, { currentUser }: ApolloContext) => {
-    if (!currentUser) throw new Error("Authentication required");
+    if (!currentUser) throw gqlError(unauthenticated());
     if (currentUser.role === 0) return userService.getUserById(id);
     return null;
   },
@@ -24,7 +27,7 @@ const Mutation = {
     { id, input }: { id: string; input: UpdateUserInput },
     { currentUser }: ApolloContext,
   ) => {
-    if (!currentUser) throw new Error("Authentication required");
+    if (!currentUser) throw gqlError(unauthenticated());
     if (currentUser.role === 0) return userService.updateUser(id, input);
     return null;
   },
@@ -33,7 +36,7 @@ const Mutation = {
     { id, role }: { id: string; role: number },
     { currentUser }: ApolloContext,
   ) => {
-    if (!currentUser) throw new Error("Authentication required");
+    if (!currentUser) throw gqlError(unauthenticated());
     if (currentUser.role === 0) return userService.updateUserRole(id, role);
     return null;
   },
@@ -42,7 +45,7 @@ const Mutation = {
     { id, status }: { id: string; status: number },
     { currentUser }: ApolloContext,
   ) => {
-    if (!currentUser) throw new Error("Authentication required");
+    if (!currentUser) throw gqlError(unauthenticated());
     if (currentUser.role === 0) return userService.updateUserStatus(id, status);
     return null;
   },
@@ -51,7 +54,7 @@ const Mutation = {
     { id }: { id: string },
     { currentUser }: ApolloContext,
   ) => {
-    if (!currentUser) throw new Error("Authentication required");
+    if (!currentUser) throw gqlError(unauthenticated());
     if (currentUser.role === 0) return userService.deleteUser(id);
     return null;
   },
@@ -62,7 +65,9 @@ export default {
     id: (parent: any) => {
       const v = parent?.id ?? parent?._id;
       if (v === undefined || v === null) {
-        throw new Error("User.id: parent has neither id nor _id");
+        throw new GraphQLError("Internal server error", {
+          extensions: { code: "INTERNAL_SERVER_ERROR" },
+        });
       }
       return String(v);
     },

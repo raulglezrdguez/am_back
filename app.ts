@@ -14,6 +14,7 @@ import apiRoutes from "./api/routes/index.ts";
 import { type ApolloContext } from "./config/apollo.context.ts";
 import { TRUST_PROXY } from "./config/index.ts";
 import { createRateLimitMiddlewares } from "./middlewares/rateLimit.ts";
+import { notFound } from "./errors/appError.ts";
 
 export const createServer = async () => {
   const app = express();
@@ -55,9 +56,7 @@ export const createServer = async () => {
   );
 
   app.use(apiRoutes);
-  app.use((req, res) =>
-    res.status(404).send({ error: "Route not found", requestId: req.id }),
-  );
+  app.use((req, _res, next) => next(notFound("Resource not found")));
 
   // Sentry debe ir antes del handler propio; si no está inicializado, es no-op.
   if (Sentry.getClient()) {
